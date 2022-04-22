@@ -203,6 +203,12 @@ local function setup(board)
 	-- an array of all the pieces on the board
 	-- except we're using a dictionary
 	local pieces = getNewBoard()
+	-- create a registry for pieces, returns the index of the array
+	local pieceRegistry = {}
+	for idx, piece in pairs(pieces) do
+		pieceRegistry[piece.Name][piece.O] = idx
+	end
+
 	-- variable that stores if the game is not over
 	local gameended = false
 
@@ -478,7 +484,7 @@ local function setup(board)
 						if spot then
 							-- check ownership
 							-- if we own, do not include the spot as a valid move
-							if spot.O ~= call.O then
+							if spot.O ~= pieceInQuestion.O then
 								-- otherwise, add it as a valid move directly into the insert
 								table.insert(available, {
 									X = currentX,
@@ -499,7 +505,7 @@ local function setup(board)
 					end
 				end
 
-				if call.P == Rank.PROMOTED then
+				if pieceInQuestion.P == Rank.PROMOTED then
 					for coordinate in {
 						{
 							1, 0
@@ -512,19 +518,19 @@ local function setup(board)
 							0, 1
 						}
 					} do
-						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
+						table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
 					end
 				end
 			end
 
 			for dy, dx in dydxList do
-				local newY = call.Y + dy
-				local newX = call.X + dx
+				local newY = pieceInQuestion.Y + dy
+				local newX = pieceInQuestion.X + dx
 
 				if ~(newY > 9 or newY < 1) and ~(newX > 9 or newX < 1) then
 					local spot = hashmap[newX][newY]
 					if spot then
-						if spot.O ~= call.O then
+						if spot.O ~= pieceInQuestion.O then
 							table.insert(available, {
 								X = newX,
 								Y = newY
@@ -541,29 +547,18 @@ local function setup(board)
 	-- function that takes the name of a piece and a table, returns if it checks
 	-- the king?
 	-- how are we getting the name in piece ?
-	local function check(pieceName, newtable, owner)
-		local pieces = newtable or pieces
-
+	local function check(piece, newtable)
 		-- iterate over the array until we find owner
 		-- this is less efficient than a hashmap (what we were using before)...
 		-- pieces are immutable anyway so using a registry might be best
 		-- for now we'll iterate
-		local call = nil
-		for pc in pieces do
-			if pc.Name == pieceName and pc.O == owner then
-				call = pc
-				break
-			end
-		end
-
-		if call == nil then return end
 
 		local check = false
 
 		for piece in pieces do
-			if piece.O == call.O * -1 then
-				for spot in findavailable(call, newtable) do
-					if spot.X == call.X and spot.Y == call.Y then
+			if piece.O == piece.O * -1 then
+				for spot in findavailable(piece, newtable) do
+					if spot.X == piece.X and spot.Y == piece.Y then
 						check = true
 					end
 				end
@@ -573,10 +568,10 @@ local function setup(board)
 	end
 
 	-- don't know, might just be for the AI
-	local function moves(pieceName, newtable)
+	local function moves(pieceName, newtable, registry)
 		local pieces = newtable or pieces
 		-- again, not sure how we're getting the piece name
-		local pieceInQuestion = pieces[pieceName]
+		-- local pieceInQuestion = pieces[pieceName]
 
 		if pieceInQuestion == nil then return end
 
@@ -615,28 +610,38 @@ local function setup(board)
 			newPieceInQuestion.X = available.X
 			newPieceInQuestion.Y = available.Y
 
-			if not check("King", newtable, pieceInQuestion.O) then
+			local kingPiece = registry[pieceInQuestion.O]["King"]
+			if not check(kingPiece, newtable) then
 				table.insert(newavailable, available)
 			end
 		end
 		return newavailable
 	end
 
+	-- add a listener to every piece
 	for i, v in pairs(pieces) do
-		v.K.Parent = game.Workspace.Pieces
-		v.K.CFrame = origin * CFrame.new(12.5 - 2.5 * v.X, 1.6, 2.5 * v.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * v.O, math.pi / 36)
-		v.K.ClickDetector.MouseClick:Connect(function(player)
-			if cool == true then return end
-			if gameended == true then return end
+		-- on click
+		local function onClick()
+			-- ?????????
+			-- if cool == true then return end
+
+			-- if gameended == true then return end
+
+			-- if we're on the right turn
 			if v.O == turn then
+				-- create available move
 				local available = moves(i)
-				game.ReplicatedStorage.RemoteEvent:FireClient(player, i, "place", available, v, board)
+
+				-- render available move?
+				-- game.ReplicatedStorage.RemoteEvent:FireClient(player, i, "place", available, v, board)
 			else
-				game.ReplicatedStorage.RemoteEvent:FireClient(player, nil, "attack", v)
+				-- game.ReplicatedStorage.RemoteEvent:FireClient(player, nil, "attack", v)
+				-- confirm available move(kill)
 			end
-		end)
+		end
 	end
 
+	-- move the piece
 	local function movepiece(plr, piece, x, y, promote)
 		if gameended == true then return end
 		local call = pieces[piece]
