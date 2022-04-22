@@ -240,7 +240,7 @@ local function setup(board)
 		-- hashmap
 		local hashmap = {}
 		for piece in pieces do
-			hashmap[piece.Y][piece.X] = true;
+			hashmap[piece.X][piece.Y] = piece;
 		end
 
 		-- potential bug: if it's pawn then there's literally no available squares
@@ -391,12 +391,47 @@ local function setup(board)
 					end
 				end
 			elseif pieceName == "Rook" then
-				for dx in -9, 9 do
-					table.insert(dydxList, { 0, dx })
+				-- the rook can go in four directions
+				local directionsDydx = {
+					{ 1, 0 },
+					{ -1, 0 },
+					{ 0, 1 },
+					{ 0, -1 }
+				}
+
+				-- for each direction
+				for dy, dx in directionsDydx do
+					local currentX = call.X + dx
+					local currentY = call.Y + dy
+					-- get position of rook in this direction
+					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
+						local spot = hashmap[currentX][currentY]
+
+						-- if there is a piece in the way, our rook cannot move further
+						if spot then
+							-- check ownership
+							-- if we own, do not include the spot as a valid move
+							if spot.O == call.O then
+								-- otherwise, add it as a valid move directly into the insert
+								table.insert(available, {
+									X = currentX,
+									Y = currentY
+								})
+							end
+							-- break out
+							break
+						else
+							table.insert(available, {
+								X = currentX,
+								Y = currentY
+							})
+						end
+
+						currentX = currentX + dx
+						currentY = currentY + dy
+					end
 				end
-				for dy in -9, 9 do
-					table.insert(dydxList, { 0, dy })
-				end
+
 				if call.P == Rank.PROMOTED then
 					for coordinate in {
 						{
@@ -414,14 +449,48 @@ local function setup(board)
 					end
 				end
 			elseif pieceName == "Bishop" then
-				for d in -9, 9 do
-					table.insert(dydxList, { d, d })
-					if d ~= -d then
-						table.insert(dydxList, { d, -d })
+				-- the bishop can go in four directions
+				local directionsDydx = {
+					{ 1, 1 },
+					{ 1, -1 },
+					{ -1, 1 },
+					{ -1, -1 }
+				}
+
+				-- for each direction
+				for dy, dx in directionsDydx do
+					local currentX = call.X + dx
+					local currentY = call.Y + dy
+					-- get position of bishop in this direction
+					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
+						local spot = hashmap[currentX][currentY]
+
+						-- if there is a piece in the way, our bishop cannot move further
+						if spot then
+							-- check ownership
+							-- if we own, do not include the spot as a valid move
+							if spot.O ~= call.O then
+								-- otherwise, add it as a valid move directly into the insert
+								table.insert(available, {
+									X = currentX,
+									Y = currentY
+								})
+							end
+							-- break out
+							break
+						else
+							table.insert(available, {
+								X = currentX,
+								Y = currentY
+							})
+						end
+
+						currentX = currentX + dx
+						currentY = currentY + dy
 					end
 				end
-				if call.P == Rank.NORMAL then
-				else
+
+				if call.P == Rank.PROMOTED then
 					for coordinate in {
 						{
 							1, 0
@@ -444,11 +513,17 @@ local function setup(board)
 				local newX = call.X + dx
 
 				if ~(newY > 9 or newY < 1) and ~(newX > 9 or newX < 1) then
-					
+					local spot = hashmap[newX][newY]
+					if spot then
+						if spot.O ~= call.O then
+							table.insert(available, {
+								X = newX,
+								Y = newY
+							})
+						end
+					end
 				end
 			end
-
-			-- TODO we can do much, much better
 
 		end
 		return available
@@ -526,6 +601,7 @@ local function setup(board)
 			end
 		end)
 	end
+
 	local function movepiece(plr, piece, x, y, promote)
 		if gameended == true then return end
 		local call = pieces[piece]
