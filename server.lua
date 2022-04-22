@@ -196,7 +196,7 @@ end
 -- end
 
 -- sets up pieces for both players
-local function setup(board)
+local function setup()
 	-- seems to be a 3d coordinate of some sort
 	-- local origin = CFrame.new(board.Position)
 
@@ -210,17 +210,17 @@ local function setup(board)
 	end
 
 	-- variable that stores if the game is not over
-	local gameended = false
+	local running = true
 
 	-- local player1 = nil
 	-- board.Pillow1.BillboardGui.TextLabel.Text = "Empty"
-	-- local bot1 = false
+	local bot1 = false
 	-- board.Bot1.Color = Color3.new(1, 0, 0)
 	-- board.Bot1.SurfaceGui.TextLabel.Text = "Bot: Off"
 
 	-- local player2 = nil
 	-- board.Pillow2.BillboardGui.TextLabel.Text = "Empty"
-	-- local bot2 = false
+	local bot2 = false
 	-- board.Bot2.Color = Color3.new(1, 0, 0)
 	-- board.Bot2.SurfaceGui.TextLabel.Text = "Bot: Off"
 
@@ -669,7 +669,7 @@ local function setup(board)
 
 	-- move the piece
 	local function movepiece(plr, pieceName, x, y, promote, registry)
-		if gameended == true then return end
+		if running == true then return end
 
 		-- not sure how we're getting the piecename
 		local call = pieces[pieceName]
@@ -752,7 +752,7 @@ local function setup(board)
 
 				local goal = {}
 
-				-- special animations for knight 
+				-- special animations for knight
 				-- if oldx == 0 then
 				-- 	-- goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
 				-- 	-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
@@ -772,256 +772,299 @@ local function setup(board)
 						call.P = 2
 					end
 				end
-				if oldp == 2 then
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-				else
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
-				end
-				tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-				wait(0.5)
-				if oldp == 1 and call.P == 2 then
-					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
-					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
-					wait(0.25)
-				end
+
+				-- if oldp == 2 then
+				-- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+				-- else
+				-- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+				-- end
+
+				-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+				-- wait(0.5)
+
+				-- if oldp == 1 and call.P == 2 then
+				-- 	wait(0.25)
+				-- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+				-- 	tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+				-- 	wait(0.75)
+				-- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+				-- 	tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
+				-- 	wait(0.25)
+				-- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+				-- 	tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
+				-- 	wait(0.25)
+				-- end
+
 				turn = turn * -1
+
 				local addon = ""
+
 				local player = turn / 2 + 1.5
-				local check = check("King" .. player)
+
+				local kingPiece = registry[player]["King"]
+				local check = check(kingPiece)
+
 				if check == true then
 					addon = "Check - "
 				end
-				board.BillboardGui.TextLabel.Text = addon .. "Player " .. player .. "'s Turn"
-				board.Selected.Position = Vector3.new(0, -3.2, -17.5 * turn) + origin.p
+
+				-- update text for player's turn
+				-- board.BillboardGui.TextLabel.Text = addon .. "Player " .. player .. "'s Turn"
+				-- board.Selected.Position = Vector3.new(0, -3.2, -17.5 * turn) + origin.p
+
 				local numofmoves = 0
-				for i, v in pairs(pieces) do
-					if v.O == turn then
-						local available = moves(i)
+				for piece in pieces do
+					if piece.O == turn then
+						local available = moves(piece.Name)
 						numofmoves = numofmoves + #available
 					end
 				end
+
 				if numofmoves == 0 then
-					board.BillboardGui.TextLabel.Text = "Checkmate - Player " .. player .. " Wins"
-					gameended = true
+					-- create toast for player winning and losing
+					-- board.BillboardGui.TextLabel.Text = "Checkmate - Player " .. player .. " Wins"
+					running = false
 				end
 			end
 		end
 		cool = false
 	end
 
-	delay(0, function()
-		while gameended == false do
-			local bot = false
-			if bot1 == true and turn == -1 then
-				bot = true
-			elseif bot2 == true and turn == 1 then
-				bot = true
-			end
-			if bot == true then
-				local piecetomove = {}
-				local move = {}
-				local movevalue = math.huge * -1
-				for i, v in pairs(pieces) do
-					if v.O == turn then
-						local available = moves(i)
-						for c = 1, #available do
-							local moveworth = 0
-							local indanger = check(i)
-							if indanger == true then
-								if v.P == 1 then
-									if v.K.Name == "Pawn" then
+	-- what is delay?
+	-- delay(0, function()
+	-- seems to be the core gameloop
+
+	while running do
+		local hashmap = {}
+		for piece in pieces do
+			hashmap[piece.X][piece.Y] = piece;
+		end
+
+		local bot = false
+
+		if bot1 == true and turn == -1 then
+			bot = true
+		elseif bot2 == true and turn == 1 then
+			bot = true
+		end
+
+		-- if we've enabled a bot
+		if bot == true then
+			local piecetomove = {}
+			local move = {}
+			local movevalue = math.huge * -1
+
+			-- iterate over every piece
+			for pieceIdx, piece in pairs(pieces) do
+				-- if it's our piece
+				if piece.O == turn then
+					-- check the available moves
+					for availableIdx, available in pairs(moves(piece)) do
+						local moveworth = 0
+						local indanger = check(piece)
+
+						-- if we're in check then (probably) decide on the
+						-- value of pieces to sacrifice
+						if indanger == true then
+							if piece.P == Player.ONE then
+								if piece.Name == "Pawn" then
+									moveworth = moveworth + 1
+								elseif piece.Name == "Knight" then
+									moveworth = moveworth + 4
+								elseif piece.Name == "Lance" then
+									moveworth = moveworth + 6
+								elseif piece.Name == "Silver" then
+									moveworth = moveworth + 9
+								elseif piece.Name == "Gold" then
+									moveworth = moveworth + 10
+								elseif piece.Name == "Bishop" then
+									moveworth = moveworth + 15
+								elseif piece.Name == "Rook" then
+									moveworth = moveworth + 16
+								end
+							else
+								if piece.Name == "Pawn" then
+									moveworth = moveworth + 8
+								elseif piece.Name == "Knight" then
+									moveworth = moveworth + 8
+								elseif piece.Name == "Lance" then
+									moveworth = moveworth + 8
+								elseif piece.Name == "Silver" then
+									moveworth = moveworth + 9
+								elseif piece.Name == "Bishop" then
+									moveworth = moveworth + 25
+								elseif piece.Name == "Rook" then
+									moveworth = moveworth + 27
+								end
+							end
+						end
+
+						-- copy over table
+						local newtable = {}
+						for piece in pieces do
+							table.insert(newtable, {
+								X = piece.X,
+								Y = piece.Y,
+								P = piece.P,
+								O = piece.O
+							})
+						end
+
+						-- check if we're moving into a spot that has an opponent's piece
+						local spot = hashmap(available, newtable)
+						if spot then
+							if spot.O ~= piece.O then
+								if spot.P == 1 then
+									if spot.Name == "Pawn" then
 										moveworth = moveworth + 1
-									elseif v.K.Name == "Knight" then
+									elseif spot.Name == "Knight" then
 										moveworth = moveworth + 4
-									elseif v.K.Name == "Lance" then
+									elseif spot.Name == "Lance" then
 										moveworth = moveworth + 6
-									elseif v.K.Name == "Silver" then
+									elseif spot.Name == "Silver" then
 										moveworth = moveworth + 9
-									elseif v.K.Name == "Gold" then
+									elseif spot.Name == "Gold" then
 										moveworth = moveworth + 10
-									elseif v.K.Name == "Bishop" then
+									elseif spot.Name == "Bishop" then
 										moveworth = moveworth + 15
-									elseif v.K.Name == "Rook" then
+									elseif spot.Name == "Rook" then
 										moveworth = moveworth + 16
 									end
 								else
-									if v.K.Name == "Pawn" then
+									if spot.Name == "Pawn" then
 										moveworth = moveworth + 8
-									elseif v.K.Name == "Knight" then
+									elseif spot.Name == "Knight" then
 										moveworth = moveworth + 8
-									elseif v.K.Name == "Lance" then
+									elseif spot.Name == "Lance" then
 										moveworth = moveworth + 8
-									elseif v.K.Name == "Silver" then
+									elseif spot.Name == "Silver" then
 										moveworth = moveworth + 9
-									elseif v.K.Name == "Bishop" then
+									elseif spot.Name == "Bishop" then
 										moveworth = moveworth + 25
-									elseif v.K.Name == "Rook" then
+									elseif spot.Name == "Rook" then
 										moveworth = moveworth + 27
 									end
 								end
+								-- if so, move the piece to our posession
+								spot.X = 0
+								spot.Y = 0
+								spot.P = 1
+								spot.O = piece.O
 							end
-							local newtable = {}
-							for i, v in pairs(pieces) do
-								newtable[i] = {}
-								newtable[i].K = v.K
-								newtable[i].X = v.X
-								newtable[i].Y = v.Y
-								newtable[i].P = v.P
-								newtable[i].O = v.O
-							end
-							local spot = piece_exists_at(available[c], newtable)
-							if spot then
-								if spot.O ~= v.O then
-									if spot.P == 1 then
-										if spot.K.Name == "Pawn" then
-											moveworth = moveworth + 1
-										elseif spot.K.Name == "Knight" then
-											moveworth = moveworth + 4
-										elseif spot.K.Name == "Lance" then
-											moveworth = moveworth + 6
-										elseif spot.K.Name == "Silver" then
-											moveworth = moveworth + 9
-										elseif spot.K.Name == "Gold" then
-											moveworth = moveworth + 10
-										elseif spot.K.Name == "Bishop" then
-											moveworth = moveworth + 15
-										elseif spot.K.Name == "Rook" then
-											moveworth = moveworth + 16
-										end
-									else
-										if spot.K.Name == "Pawn" then
-											moveworth = moveworth + 8
-										elseif spot.K.Name == "Knight" then
-											moveworth = moveworth + 8
-										elseif spot.K.Name == "Lance" then
-											moveworth = moveworth + 8
-										elseif spot.K.Name == "Silver" then
-											moveworth = moveworth + 9
-										elseif spot.K.Name == "Bishop" then
-											moveworth = moveworth + 25
-										elseif spot.K.Name == "Rook" then
-											moveworth = moveworth + 27
-										end
-									end
-									spot.X = 0
-									spot.Y = 0
-									spot.P = 1
-									spot.O = v.O
-								end
-							end
-							newtable[i].X = available[c].X
-							newtable[i].Y = available[c].Y
-							wait()
-							local check = false
-							for b, n in pairs(pieces) do
-								if n.O == v.O * -1 then
-									local spot = findavailable(b, newtable)
-									for c = 1, #spot do
-										if spot[c].X == newtable[i].X and spot[c].Y == newtable[i].Y then
-											check = true
-										end
+						end
+						-- update that piece's location to its new available location
+						newtable[pieceIdx].X = available[availableIdx].X
+						newtable[pieceIdx].Y = available[availableIdx].Y
+
+						local check = false
+						for tPieceIdx, tPiece in pairs(pieces) do
+							-- if the piece is not owned by the player
+							if tPiece.O == piece.O * -1 then
+								for spot in findavailable(tPieceIdx, newtable) do
+									if spot.X == newtable[pieceIdx].X and spot.Y == newtable[pieceIdx].Y then
+										check = true
 									end
 								end
 							end
-							if check == true then
-								if v.P == 1 then
-									if v.K.Name == "Pawn" then
-										moveworth = moveworth - 1
-									elseif v.K.Name == "Knight" then
-										moveworth = moveworth - 4
-									elseif v.K.Name == "Lance" then
-										moveworth = moveworth - 6
-									elseif v.K.Name == "Silver" then
-										moveworth = moveworth - 9
-									elseif v.K.Name == "Gold" then
-										moveworth = moveworth - 10
-									elseif v.K.Name == "Bishop" then
-										moveworth = moveworth - 15
-									elseif v.K.Name == "Rook" then
-										moveworth = moveworth - 16
-									end
-								else
-									if v.K.Name == "Pawn" then
-										moveworth = moveworth - 8
-									elseif v.K.Name == "Knight" then
-										moveworth = moveworth - 8
-									elseif v.K.Name == "Lance" then
-										moveworth = moveworth - 8
-									elseif v.K.Name == "Silver" then
-										moveworth = moveworth - 9
-									elseif v.K.Name == "Bishop" then
-										moveworth = moveworth - 25
-									elseif v.K.Name == "Rook" then
-										moveworth = moveworth - 27
-									end
+						end
+
+						if check == true then
+							if piece.P == 1 then
+								if piece.Name == "Pawn" then
+									moveworth = moveworth - 1
+								elseif piece.Name == "Knight" then
+									moveworth = moveworth - 4
+								elseif piece.Name == "Lance" then
+									moveworth = moveworth - 6
+								elseif piece.Name == "Silver" then
+									moveworth = moveworth - 9
+								elseif piece.Name == "Gold" then
+									moveworth = moveworth - 10
+								elseif piece.Name == "Bishop" then
+									moveworth = moveworth - 15
+								elseif piece.Name == "Rook" then
+									moveworth = moveworth - 16
+								end
+							else
+								if piece.Name == "Pawn" then
+									moveworth = moveworth - 8
+								elseif piece.Name == "Knight" then
+									moveworth = moveworth - 8
+								elseif piece.Name == "Lance" then
+									moveworth = moveworth - 8
+								elseif piece.Name == "Silver" then
+									moveworth = moveworth - 9
+								elseif piece.Name == "Bishop" then
+									moveworth = moveworth - 25
+								elseif piece.Name == "Rook" then
+									moveworth = moveworth - 27
 								end
 							end
-							if moveworth == movevalue then
-								movevalue = moveworth
-								local num = #piecetomove + 1
-								piecetomove[num] = i
-								move[num] = available[c]
-							elseif moveworth > movevalue then
-								movevalue = moveworth
-								local num = 1
-								piecetomove = {}
-								move = {}
-								piecetomove[num] = i
-								move[num] = available[c]
-							end
+						end
+
+						if moveworth == movevalue then
+							movevalue = moveworth
+							local num = #piecetomove + 1
+							piecetomove[num] = pieceIdx
+							move[num] = available[availableIdx]
+						elseif moveworth > movevalue then
+							movevalue = moveworth
+							local num = 1
+							piecetomove = {}
+							move = {}
+							piecetomove[num] = pieceIdx
+							move[num] = available[availableIdx]
 						end
 					end
 				end
-				if #piecetomove >= 1 then
-					local num = math.random(1, #piecetomove)
-					movepiece(nil, piecetomove[num], move[num].X, move[num].Y, true)
-				end
 			end
-			wait(0.1)
-		end
-	end)
-	game.ReplicatedStorage.RemoteEvent.OnServerEvent:Connect(function(plr, piece, x, y, promote)
-		if gameended == true then return end
-		if plr ~= player1 and turn == -1 then return end
-		if plr ~= player2 and turn == 1 then return end
-		movepiece(plr, piece, x, y, promote)
-	end)
-	local plr1time = 0
-	board.Timer1.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr1time)
-	local plr2time = 0
-	board.Timer2.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr2time)
-	repeat
-		wait(0.1)
-		if turn == -1 then
-			if player1 ~= nil or bot1 == true then
-				plr1time = plr1time + 0.1
-				board.Timer1.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr1time)
-			end
-		elseif turn == 1 then
-			if player2 ~= nil or bot2 == true then
-				plr2time = plr2time + 0.1
-				board.Timer2.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr2time)
+			if #piecetomove >= 1 then
+				local num = math.random(1, #piecetomove)
+				movepiece(nil, piecetomove[num], move[num].X, move[num].Y, true)
 			end
 		end
-	until gameended == true
-	wait(5)
-	for i, v in pairs(pieces) do
-		v.K:Destroy()
+		-- wait(0.1)
 	end
+	-- end)
+
+	-- game.ReplicatedStorage.RemoteEvent.OnServerEvent:Connect(function(plr, piece, x, y, promote)
+	-- 	if running == true then return end
+	-- 	if plr ~= player1 and turn == -1 then return end
+	-- 	if plr ~= player2 and turn == 1 then return end
+	-- 	movepiece(plr, piece, x, y, promote)
+	-- end)
+
+	local plr1time = 0
+	-- label board
+	local timeLabelOne = "Time: " .. math.floor(plr1time)
+	-- board.Timer1.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr1time)
+	local plr2time = 0
+	local timeLabelTwo = "Time: " .. math.floor(plr2time)
+	-- board.Timer2.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr2time)
+
+	repeat
+		-- wait(0.1)
+		if turn == -1 then
+			-- if player1 ~= nil or bot1 == true then
+			plr1time = plr1time + 0.1
+			timeLabelOne = "Time: " .. math.floor(plr1time)
+			-- end
+		elseif turn == 1 then
+			-- if player2 ~= nil or bot2 == true then
+			plr2time = plr2time + 0.1
+			timeLabelTwo = "Time: " .. math.floor(plr2time)
+			-- end
+		end
+	until running == false
 end
 
-local chil = game.Workspace.Boards:GetChildren()
-for i = 1, #chil do
-	delay(0, function()
-		while true do
-			setup(chil[i])
-		end
-	end)
-end
+-- local chil = game.Workspace.Boards:GetChildren()
+-- for i = 1, #chil do
+-- 	delay(0, function()
+-- 		while true do
+-- setup(chil[i])
+-- 		end
+-- 	end)
+-- end
+
+setup()
