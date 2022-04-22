@@ -668,76 +668,101 @@ local function setup(board)
 	end
 
 	-- move the piece
-	local function movepiece(plr, piece, x, y, promote)
+	local function movepiece(plr, pieceName, x, y, promote, registry)
 		if gameended == true then return end
-		local call = pieces[piece]
+
+		-- not sure how we're getting the piecename
+		local call = pieces[pieceName]
 		if call == nil then return end
 		if turn ~= call.O then return end
 		-- what is TRUE
 		if cool == true then return end
 		cool = true
+
+		local hashmap = {}
+		for piece in pieces do
+			hashmap[piece.X][piece.Y] = piece;
+		end
+
+		-- unpromote the piece if we're moving it to storage
 		if call.X == 0 or call.Y == 0 then
 			promote = false
 		end
-		local available = moves(piece)
-		for i = 1, #available do
-			if available[i].X == x and available[i].Y == y then
-				local spot = piece_exists_at(available[i])
+
+		local hashmap = {}
+		for piece in pieces do
+			hashmap[piece.X][piece.Y] = piece;
+		end
+
+		-- get all available moves
+		for available in moves(pieceName) do
+			if available.X == x and available.Y == y then
+				local spot = hashmap[available.X][available.Y]
 				if spot then
 					if spot.O ~= call.O then
 						local goal = {}
-						goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
+						-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						spot.X = 0
 						spot.Y = 0
 						spot.P = 1
 						spot.O = call.O
-						wait(0.75)
-						goal.CFrame = origin * CFrame.new(-16 * spot.O, 5, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
-						wait(0.5)
-						if spot.K.Name == "Pawn" then
-							local ran = math.random(1, 3) - 2
-							goal.CFrame = origin * CFrame.new((-16 + ran * 2.5) * spot.O, 0.306, -5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Lance" then
-							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Knight" then
-							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Silver" then
-							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Gold" then
-							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Bishop" then
-							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Rook" then
-							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						end
-						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
-						wait(0.5)
+						-- wait(0.75)
+						-- goal.CFrame = origin * CFrame.new(-16 * spot.O, 5, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
+						-- wait(0.5)
+
+						-- I'm assuming this is to animate piece movement and move the camera angle
+						-- if spot.Name == "Pawn" then
+						-- 	-- local ran = math.random(1, 3) - 2
+						-- 	-- goal.CFrame = origin * CFrame.new((-16 + ran * 2.5) * spot.O, 0.306, -5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Lance" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Knight" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Silver" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Gold" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Bishop" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.Name == "Rook" then
+						-- 	-- goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- end
+						-- tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
+						-- wait(0.5)
 					else
 						cool = false
 						return
 					end
 				end
+
+				-- the old piece that we're moving
 				local oldp = call.P
 				local oldx = call.X
-				if promote == true and call.K.Name ~= "Gold" and call.K.Name ~= "King" and call.K.Name ~= "Jewel" then
-					if call.O == -1 and call.Y <= 3 then
-						call.P = 2
-					elseif call.O == 1 and call.Y >= 7 then
-						call.P = 2
+
+				-- promote depending on the player and row
+				if promote == true and call.Name ~= "Gold" and call.Name ~= "King" and call.Name ~= "Jewel" then
+					if call.O == Player.TWO and call.Y <= 3 then
+						call.P = Rank.PROMOTED
+					elseif call.O == Player.ONE and call.Y >= 7 then
+						call.P = Rank.PROMOTED
 					end
 				end
+
 				local goal = {}
-				if oldx == 0 then
-					goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
-				elseif string.sub(piece, 1, 6) == "Knight" and call.P == 1 then
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
-				end
+
+				-- special animations for knight 
+				-- if oldx == 0 then
+				-- 	-- goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+				-- 	-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+				-- 	-- wait(0.75)
+				-- elseif string.sub(pieceName, 1, 6) == "Knight" and call.P == 1 then
+				-- 	-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+				-- 	-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+				-- 	-- wait(0.75)
+				-- end
+
 				call.X = x
 				call.Y = y
 				if promote == true and call.K.Name ~= "Gold" and call.K.Name ~= "King" and call.K.Name ~= "Jewel" then
