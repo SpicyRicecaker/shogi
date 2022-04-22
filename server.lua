@@ -185,6 +185,16 @@ local function getNewBoard()
 	return pieces
 end
 
+-- local function queryPiece(queryPiece, pieceList)
+-- 	for piece in pieceList do
+-- 		-- comparing equality of objects
+-- 		if table.concat(piece) == table.concat(queryPiece) then
+-- 			return piece
+-- 		end
+-- 	end
+-- 	return false
+-- end
+
 -- sets up pieces for both players
 local function setup(board)
 	-- seems to be a 3d coordinate of some sort
@@ -226,18 +236,17 @@ local function setup(board)
 	-- end
 
 	-- probably find all places we can move
-	local function findavailable(pieceName, newtable)
+	local function findavailable(pieceInQuestion, newtable)
 		-- board of current pieces
 		local pieces = newtable or pieces
 
-		-- location of piece
-		local call = pieces[pieceName]
 		-- we should never need this
-		if call == nil then return end
+		if pieceInQuestion == nil then return end
+		local pieceName = pieceInQuestion.Name
 
 		local available = {}
 
-		-- hashmap
+		-- hashmap, stores existing pieces at their coordinates
 		local hashmap = {}
 		for piece in pieces do
 			hashmap[piece.X][piece.Y] = piece;
@@ -245,7 +254,7 @@ local function setup(board)
 
 		-- potential bug: if it's pawn then there's literally no available squares
 		-- if we've clicked outside of the arena?
-		if call.X == 0 or call.Y == 0 then
+		if pieceInQuestion.X == 0 or pieceInQuestion.Y == 0 then
 			-- if we're placing a pawn somewhere on the board, check if there is a pawn in that column already
 			for h = 1, 9 do
 				local pawn = false
@@ -255,7 +264,7 @@ local function setup(board)
 						-- if there is a spot on the table for this location
 						local spot = hashmap[h][v]
 						if spot then
-							if spot.O == call.O and spot.Name == "Pawn" and spot.P == 1 then
+							if spot.O == pieceInQuestion.O and spot.Name == "Pawn" and spot.P == 1 then
 								pawn = true
 								break
 							end
@@ -272,11 +281,11 @@ local function setup(board)
 						-- we can only send all other peaces up second to last rank
 						if not spot then
 							if pieceName == "Knight" then
-								if call.O * 3 + 5 ~= v then
+								if pieceInQuestion.O * 3 + 5 ~= v then
 									table.insert(available, { X = h, Y = v })
 								end
 							else
-								if call.O * 4 + 5 ~= v then
+								if pieceInQuestion.O * 4 + 5 ~= v then
 									table.insert(available, { X = h, Y = v })
 								end
 							end
@@ -296,28 +305,28 @@ local function setup(board)
 
 			-- if it's pawn promote to gold
 			if pieceName == "Pawn" then
-				if call.P == Rank.NORMAL then
-					table.insert(dydxList, { -1 * call.O, 0 })
+				if pieceInQuestion.P == Rank.NORMAL then
+					table.insert(dydxList, { -1 * pieceInQuestion.O, 0 })
 				else
 					for y = -1, 1 do
 						for x = -1, 1 do
 							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
-								table.insert(dydxList, { y * call.O, x })
+								table.insert(dydxList, { y * pieceInQuestion.O, x })
 							end
 						end
 					end
 				end
 				-- for lance, dynamically generate a list of dydx at runtime
 			elseif pieceName == "Lance" then
-				if call.P == Rank.NORMAL then
-					if call.O == Player.ONE then
+				if pieceInQuestion.P == Rank.NORMAL then
+					if pieceInQuestion.O == Player.ONE then
 						-- might be a bug, we'll see
-						for y = call.Y + 1, 9, 1 do
-							table.insert(dydxList, { y - call.Y, 0 })
+						for y = pieceInQuestion.Y + 1, 9, 1 do
+							table.insert(dydxList, { y - pieceInQuestion.Y, 0 })
 						end
 					else
-						for y = call.Y - 1, 1, -1 do
-							table.insert(dydxList, { call.Y - y, 0 })
+						for y = pieceInQuestion.Y - 1, 1, -1 do
+							table.insert(dydxList, { pieceInQuestion.Y - y, 0 })
 						end
 					end
 				else
@@ -325,29 +334,29 @@ local function setup(board)
 					for y in -1, 1 do
 						for x in -1, 1 do
 							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
-								table.insert(dydxList, { y * call.O, x })
+								table.insert(dydxList, { y * pieceInQuestion.O, x })
 							end
 						end
 					end
 				end
 				-- if it's knight promote to gold
 			elseif pieceName == "Knight" then
-				if call.P == Rank.NORMAL then
+				if pieceInQuestion.P == Rank.NORMAL then
 					for x in { -1, 1 } do
-						table.insert(dydxList, { 2 * call.O, x })
+						table.insert(dydxList, { 2 * pieceInQuestion.O, x })
 					end
 				else
 					for y in -1, 1 do
 						for x in -1, 1 do
 							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
-								table.insert(dydxList, { y * call.O, x })
+								table.insert(dydxList, { y * pieceInQuestion.O, x })
 							end
 						end
 					end
 				end
 				-- if it's silver promote to gold
 			elseif pieceName == "Silver" then
-				if call.P == Rank.NORMAL then
+				if pieceInQuestion.P == Rank.NORMAL then
 					for coordinate in {
 						{
 							1, -1
@@ -363,13 +372,13 @@ local function setup(board)
 							-1, 1
 						}
 					} do
-						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
+						table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
 					end
 				else
 					for y in -1, 1 do
 						for x in -1, 1 do
 							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
-								table.insert(dydxList, { y * call.O, x })
+								table.insert(dydxList, { y * pieceInQuestion.O, x })
 							end
 						end
 					end
@@ -379,7 +388,7 @@ local function setup(board)
 				for y in -1, 1 do
 					for x in -1, 1 do
 						if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
-							table.insert(dydxList, { y * call.O, x })
+							table.insert(dydxList, { y * pieceInQuestion.O, x })
 						end
 					end
 				end
@@ -387,7 +396,7 @@ local function setup(board)
 			elseif pieceName == "King" then
 				for y in -1, 1 do
 					for x in -1, 1 do
-						table.insert(dydxList, { y * call.O, x })
+						table.insert(dydxList, { y * pieceInQuestion.O, x })
 					end
 				end
 			elseif pieceName == "Rook" then
@@ -401,8 +410,8 @@ local function setup(board)
 
 				-- for each direction
 				for dy, dx in directionsDydx do
-					local currentX = call.X + dx
-					local currentY = call.Y + dy
+					local currentX = pieceInQuestion.X + dx
+					local currentY = pieceInQuestion.Y + dy
 					-- get position of rook in this direction
 					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
 						local spot = hashmap[currentX][currentY]
@@ -411,7 +420,7 @@ local function setup(board)
 						if spot then
 							-- check ownership
 							-- if we own, do not include the spot as a valid move
-							if spot.O == call.O then
+							if spot.O == pieceInQuestion.O then
 								-- otherwise, add it as a valid move directly into the insert
 								table.insert(available, {
 									X = currentX,
@@ -432,7 +441,7 @@ local function setup(board)
 					end
 				end
 
-				if call.P == Rank.PROMOTED then
+				if pieceInQuestion.P == Rank.PROMOTED then
 					for coordinate in {
 						{
 							1, 1
@@ -445,7 +454,7 @@ local function setup(board)
 							-1, 1
 						}
 					} do
-						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
+						table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
 					end
 				end
 			elseif pieceName == "Bishop" then
@@ -459,8 +468,8 @@ local function setup(board)
 
 				-- for each direction
 				for dy, dx in directionsDydx do
-					local currentX = call.X + dx
-					local currentY = call.Y + dy
+					local currentX = pieceInQuestion.X + dx
+					local currentY = pieceInQuestion.Y + dy
 					-- get position of bishop in this direction
 					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
 						local spot = hashmap[currentX][currentY]
@@ -529,16 +538,32 @@ local function setup(board)
 		return available
 	end
 
-	local function check(piece, newtable)
+	-- function that takes the name of a piece and a table, returns if it checks
+	-- the king?
+	-- how are we getting the name in piece ?
+	local function check(pieceName, newtable, owner)
 		local pieces = newtable or pieces
-		local call = pieces[piece]
+
+		-- iterate over the array until we find owner
+		-- this is less efficient than a hashmap (what we were using before)...
+		-- pieces are immutable anyway so using a registry might be best
+		-- for now we'll iterate
+		local call = nil
+		for pc in pieces do
+			if pc.Name == pieceName and pc.O == owner then
+				call = pc
+				break
+			end
+		end
+
 		if call == nil then return end
+
 		local check = false
-		for i, v in pairs(pieces) do
-			if v.O == call.O * -1 then
-				local spot = findavailable(i, newtable)
-				for c = 1, #spot do
-					if spot[c].X == call.X and spot[c].Y == call.Y then
+
+		for piece in pieces do
+			if piece.O == call.O * -1 then
+				for spot in findavailable(call, newtable) do
+					if spot.X == call.X and spot.Y == call.Y then
 						check = true
 					end
 				end
@@ -547,41 +572,51 @@ local function setup(board)
 		return check
 	end
 
-	local function moves(piece, newtable)
+	-- don't know, might just be for the AI
+	local function moves(pieceName, newtable)
 		local pieces = newtable or pieces
-		local call = pieces[piece]
-		if call == nil then return end
+		-- again, not sure how we're getting the piece name
+		local pieceInQuestion = pieces[pieceName]
+
+		if pieceInQuestion == nil then return end
+
 		local newavailable = {}
-		local available = findavailable(piece)
-		for i = 1, #available do
+		-- local available = findavailable(pieceInQuestion)
+
+		local hashmap = {}
+		for piece in pieces do
+			hashmap[piece.X][piece.Y] = piece;
+		end
+
+		for available in findavailable(pieceInQuestion) do
+			-- clone the current table
 			local newtable = {}
+			local newPieceInQuestion = nil
 			for i, v in pairs(pieces) do
-				newtable[i] = {}
-				newtable[i].K = v.K
-				newtable[i].X = v.X
-				newtable[i].Y = v.Y
-				newtable[i].P = v.P
-				newtable[i].O = v.O
+				newtable[i] = v
+				if v.X == pieceInQuestion.X and v.Y == pieceInQuestion.Y then
+					newPieceInQuestion = newtable[i]
+				end
 			end
-			local spot = piece_exists_at(available[i], newtable)
+
+			local spot = hashmap[available.X][available.Y]
+
+			-- captured pieces in shogi go to the opponent, in which they can play anywhere
 			if spot then
-				if spot.O ~= call.O then
+				if spot.O ~= pieceInQuestion.O then
 					spot.X = 0
 					spot.Y = 0
 					spot.P = 1
-					spot.O = call.O
+					spot.O = pieceInQuestion.O
 				end
 			end
-			newtable[piece].X = available[i].X
-			newtable[piece].Y = available[i].Y
-			local check1 = nil
-			if call.O == 1 then
-				check1 = check("King1", newtable)
-			elseif call.O == -1 then
-				check1 = check("King2", newtable)
-			end
-			if check1 == false then
-				newavailable[#newavailable + 1] = available[i]
+
+			-- move the piece in question to its new spot, in the new table
+			newPieceInQuestion.X = available.X
+			newPieceInQuestion.Y = available.Y
+
+			if not check("King", newtable, pieceInQuestion.O) then
+				table.insert(newavailable, available)
 			end
 		end
 		return newavailable
