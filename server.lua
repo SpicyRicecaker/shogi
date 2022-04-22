@@ -3,6 +3,11 @@ Player = {
 	TWO = -1
 }
 
+Rank = {
+	NORMAL = 1,
+	PROMOTED = 2
+}
+
 local function swapPlayer(player)
 	return player * -1
 end
@@ -173,6 +178,10 @@ local function getNewBoard()
 		});
 	end
 
+	for piece in pieces do
+		piece.P = Rank.NORMAL;
+	end
+
 	return pieces
 end
 
@@ -212,14 +221,9 @@ local function setup(board)
 
 	-- checks if there is a piece at the current location, given a location (x,
 	-- y) and an array of pieces
-	local function something(location, newtable)
-		local pieces = newtable or pieces
-		for _, v in pairs(pieces) do
-			if v.X == location.X and v.Y == location.Y then
-				return v
-			end
-		end
-	end
+	-- local function piece_exists_at(location, hashmap)
+	-- 	return hashmap[location.Y][location.X]
+	-- end
 
 	-- probably find all places we can move
 	local function findavailable(pieceName, newtable)
@@ -232,21 +236,24 @@ local function setup(board)
 		if call == nil then return end
 
 		local available = {}
+
+		-- hashmap
+		local hashmap = {}
+		for piece in pieces do
+			hashmap[piece.Y][piece.X] = true;
+		end
+
+		-- potential bug: if it's pawn then there's literally no available squares
 		-- if we've clicked outside of the arena?
 		if call.X == 0 or call.Y == 0 then
 			-- if we're placing a pawn somewhere on the board, check if there is a pawn in that column already
 			for h = 1, 9 do
 				local pawn = false
-				if string.sub(pieceName, 1, 4) == "Pawn" then
+				if pieceName == "Pawn" then
 					for v = 1, 9 do
 						-- tab is all coordinates of the board
-						local location = {}
-						location.X = h
-						location.Y = v
-
 						-- if there is a spot on the table for this location
-						local spot = something(location, newtable)
-
+						local spot = hashmap[h][v]
 						if spot then
 							if spot.O == call.O and spot.Name == "Pawn" and spot.P == 1 then
 								pawn = true
@@ -259,413 +266,190 @@ local function setup(board)
 				if pawn == false then
 					for v = 1, 9 do
 						-- make every spot available
-						local num = #available + 1
-						available[num] = {
-							X = h,
-							Y = v
-						}
 
-						local spot = something(available[num], newtable)
-
-                        -- unless there's a piece already on there
-						if spot then
-							available[num] = nil
-						elseif string.sub(pieceName, 1, 4) == "Pawn" or string.sub(pieceName, 1, 5) == "Lance" or string.sub(pieceName, 1, 6) == "Knight" then
-							-- ????????????
-							if call.O * 4 + 5 == v then
-								available[num] = nil
-							elseif call.O * 3 + 5 == v and string.sub(pieceName, 1, 6) == "Knight" then
-								available[num] = nil
+						local spot = hashmap[h][v];
+						-- we can only send knight up to third to last rank
+						-- we can only send all other peaces up second to last rank
+						if not spot then
+							if pieceName == "Knight" then
+								if call.O * 3 + 5 ~= v then
+									table.insert(available, { X = h, Y = v })
+								end
+							else
+								if call.O * 4 + 5 ~= v then
+									table.insert(available, { X = h, Y = v })
+								end
 							end
 						end
 					end
 				end
 			end
 		else
-			-- promotion?
-			local pawn = false
-			local front = false
-			local knight = false
-			local silver = false
-			local gold = false
-			local lance = false
-			local rook = false
-			local bishop = false
+			local block = false
+			local dydxList = {}
+			-- for ALL pieces, we generate a list of dydx
+			-- we iterate over the dydx, and only then do we actually do boundary checking
+
+			-- the problem currently is the player side. We have to treat each
+			-- dy as negative or positive depending on the side the opponent is
+			-- on
+
 			-- if it's pawn promote to gold
-			if string.sub(pieceName, 1, 4) == "Pawn" then
-				pawn = true
-				if call.P == 2 then
-					front = true
-					gold = true
-				end
-			-- if it's lance promote to gold
-			elseif string.sub(pieceName, 1, 5) == "Lance" then
-				if call.P == 2 then
-					pawn = true
-					front = true
-					gold = true
+			if pieceName == "Pawn" then
+				if call.P == Rank.NORMAL then
+					table.insert(dydxList, { -1 * call.O, 0 })
 				else
-					lance = true
-				end
-			-- if it's knight promote to gold
-			elseif string.sub(pieceName, 1, 6) == "Knight" then
-				if call.P == 2 then
-					pawn = true
-					front = true
-					gold = true
-				else
-					knight = true
-				end
-			-- if it's silver promote to gold
-			elseif string.sub(pieceName, 1, 6) == "Silver" then
-				pawn = true
-				front = true
-				if call.P == 2 then
-					gold = true
-				else
-					silver = true
-				end
-			-- if it's gold promote to gold
-			elseif string.sub(pieceName, 1, 4) == "Gold" then
-				pawn = true
-				front = true
-				gold = true
-			-- if it's gold promote to gold
-			elseif string.sub(pieceName, 1, 4) == "King" then
-				pawn = true
-				front = true
-				gold = true
-				silver = true
-			elseif string.sub(pieceName, 1, 4) == "Rook" then
-				lance = true
-				rook = true
-				if call.P == 2 then
-					front = true
-					silver = true
-				end
-			elseif string.sub(pieceName, 1, 6) == "Bishop" then
-				bishop = true
-				if call.P == 2 then
-					pawn = true
-					gold = true
-				end
-			end
-			if pawn == true then
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X
-				available[num].Y = call.Y + 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-			end
-			if front == true then
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X - 1
-				available[num].Y = call.Y + 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X + 1
-				available[num].Y = call.Y + 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-			end
-			if knight == true then
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X - 1
-				available[num].Y = call.Y + 2 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X + 1
-				available[num].Y = call.Y + 2 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-			end
-			if silver == true then
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X - 1
-				available[num].Y = call.Y - 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X + 1
-				available[num].Y = call.Y - 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-			end
-			if gold == true then
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X - 1
-				available[num].Y = call.Y
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X + 1
-				available[num].Y = call.Y
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-				local num = #available + 1
-				available[num] = {}
-				available[num].X = call.X
-				available[num].Y = call.Y - 1 * call.O
-				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-					available[num] = nil
-				else
-					local spot = something(available[num], newtable)
-					if spot then
-						if spot.O == call.O then
-							available[num] = nil
-						end
-					end
-				end
-			end
-			if lance == true then
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X
-						available[num].Y = call.Y + i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
+					for y = -1, 1 do
+						for x = -1, 1 do
+							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
+								table.insert(dydxList, { y * call.O, x })
 							end
 						end
 					end
 				end
-			end
-			if rook == true then
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X
-						available[num].Y = call.Y - i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
+				-- for lance, dynamically generate a list of dydx at runtime
+			elseif pieceName == "Lance" then
+				if call.P == Rank.NORMAL then
+					if call.O == Player.ONE then
+						-- might be a bug, we'll see
+						for y = call.Y + 1, 9, 1 do
+							table.insert(dydxList, { y - call.Y, 0 })
+						end
+					else
+						for y = call.Y - 1, 1, -1 do
+							table.insert(dydxList, { call.Y - y, 0 })
+						end
+					end
+				else
+					-- gold movement
+					for y in -1, 1 do
+						for x in -1, 1 do
+							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
+								table.insert(dydxList, { y * call.O, x })
 							end
 						end
 					end
 				end
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X + i
-						available[num].Y = call.Y
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
+				-- if it's knight promote to gold
+			elseif pieceName == "Knight" then
+				if call.P == Rank.NORMAL then
+					for x in { -1, 1 } do
+						table.insert(dydxList, { 2 * call.O, x })
+					end
+				else
+					for y in -1, 1 do
+						for x in -1, 1 do
+							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
+								table.insert(dydxList, { y * call.O, x })
 							end
 						end
 					end
 				end
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X - i
-						available[num].Y = call.Y
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
+				-- if it's silver promote to gold
+			elseif pieceName == "Silver" then
+				if call.P == Rank.NORMAL then
+					for coordinate in {
+						{
+							1, -1
+						}, {
+							1, 0
+						}, {
+							1, 1
+						},
+						{
+							-1, -1
+						},
+						{
+							-1, 1
+						}
+					} do
+						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
+					end
+				else
+					for y in -1, 1 do
+						for x in -1, 1 do
+							if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
+								table.insert(dydxList, { y * call.O, x })
 							end
 						end
 					end
 				end
-			end
-			if bishop == true then
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X - i
-						available[num].Y = call.Y - i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
-							end
+				-- if it's gold promote to gold
+			elseif pieceName == "Gold" then
+				for y in -1, 1 do
+					for x in -1, 1 do
+						if ~(y == -1 and x == -1) and ~(y == -1 and x == 1) then
+							table.insert(dydxList, { y * call.O, x })
 						end
 					end
 				end
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X + i
-						available[num].Y = call.Y - i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
-							end
-						end
+				-- if it's gold promote to gold
+			elseif pieceName == "King" then
+				for y in -1, 1 do
+					for x in -1, 1 do
+						table.insert(dydxList, { y * call.O, x })
 					end
 				end
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X - i
-						available[num].Y = call.Y + i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
-							end
-						end
+			elseif pieceName == "Rook" then
+				for dx in -9, 9 do
+					table.insert(dydxList, { 0, dx })
+				end
+				for dy in -9, 9 do
+					table.insert(dydxList, { 0, dy })
+				end
+				if call.P == Rank.PROMOTED then
+					for coordinate in {
+						{
+							1, 1
+						}, {
+							1, -1
+						}, {
+							-1, -1
+						},
+						{
+							-1, 1
+						}
+					} do
+						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
 					end
 				end
-				local hit = false
-				for i = 1, 8 do
-					if hit == false then
-						local num = #available + 1
-						available[num] = {}
-						available[num].X = call.X + i
-						available[num].Y = call.Y + i * call.O
-						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
-							available[num] = nil
-						else
-							local spot = something(available[num], newtable)
-							if spot then
-								hit = true
-								if spot.O == call.O then
-									available[num] = nil
-								end
-							end
-						end
+			elseif pieceName == "Bishop" then
+				for d in -9, 9 do
+					table.insert(dydxList, { d, d })
+					if d ~= -d then
+						table.insert(dydxList, { d, -d })
+					end
+				end
+				if call.P == Rank.NORMAL then
+				else
+					for coordinate in {
+						{
+							1, 0
+						}, {
+							-1, 0
+						}, {
+							0, -1
+						},
+						{
+							0, 1
+						}
+					} do
+						table.insert(dydxList, { coordinate[0] * call.O, coordinate[1] })
 					end
 				end
 			end
+
+			for dy, dx in dydxList do
+				local newY = call.Y + dy
+				local newX = call.X + dx
+
+				if ~(newY > 9 or newY < 1) and ~(newX > 9 or newX < 1) then
+					
+				end
+			end
+
+			-- TODO we can do much, much better
+
 		end
 		return available
 	end
@@ -704,7 +488,7 @@ local function setup(board)
 				newtable[i].P = v.P
 				newtable[i].O = v.O
 			end
-			local spot = something(available[i], newtable)
+			local spot = piece_exists_at(available[i], newtable)
 			if spot then
 				if spot.O ~= call.O then
 					spot.X = 0
@@ -755,7 +539,7 @@ local function setup(board)
 		local available = moves(piece)
 		for i = 1, #available do
 			if available[i].X == x and available[i].Y == y then
-				local spot = something(available[i])
+				local spot = piece_exists_at(available[i])
 				if spot then
 					if spot.O ~= call.O then
 						local goal = {}
@@ -924,7 +708,7 @@ local function setup(board)
 								newtable[i].P = v.P
 								newtable[i].O = v.O
 							end
-							local spot = something(available[c], newtable)
+							local spot = piece_exists_at(available[c], newtable)
 							if spot then
 								if spot.O ~= v.O then
 									if spot.P == 1 then
