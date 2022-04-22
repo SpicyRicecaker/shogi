@@ -1,292 +1,280 @@
-local tween = game:GetService("TweenService")
---player 1
+Player = {
+	ONE = 1,
+	TWO = -1
+}
+
+local function swapPlayer(player)
+	return player * -1
+end
+
+-- tf is tween service?
+-- local tween = game:GetService("TweenService")
+
+local function getNewBoard()
+
+	-- local pieces = {};
+	-- each piece is a class that holds 5 variables, K, X, Y, P, and O
+	-- O is for ownership
+	-- P is for ???
+	-- X and Y are the coordinates of the piece
+	local pieces = { {
+		Name = "King",
+		X = 5,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Gold",
+		X = 4,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Gold",
+		X = 6,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Silver",
+		X = 3,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Silver",
+		X = 7,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Knight",
+		X = 2,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Knight",
+		X = 8,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Lance",
+		X = 1,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Lance",
+		X = 9,
+		Y = 1,
+		O = Player.ONE
+	},
+	{
+		Name = "Rook",
+		X = 8,
+		Y = 2,
+		O = Player.ONE
+	},
+	{
+		Name = "Bishop",
+		X = 2,
+		Y = 2,
+		O = Player.ONE
+	},
+	}
+
+	for i = 1, 9 do
+		-- "pawn1", "pawn2", etc.
+		table.insert(pieces, {
+			Name = "Pawn",
+			X = i,
+			Y = 3,
+			O = Player.ONE
+		});
+	end
+
+	local pieces = { {
+		Name = "King",
+		X = 5,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Gold",
+		X = 4,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Gold",
+		X = 6,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Silver",
+		X = 3,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Silver",
+		X = 7,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Knight",
+		X = 2,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Knight",
+		X = 8,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Lance",
+		X = 1,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Lance",
+		X = 9,
+		Y = 9,
+		O = Player.TWO
+	},
+	{
+		Name = "Rook",
+		X = 2,
+		Y = 8,
+		O = Player.TWO
+	},
+	{
+		Name = "Bishop",
+		X = 8,
+		Y = 8,
+		O = Player.TWO
+	},
+	}
+
+	for i = 1, 9 do
+		-- "pawn1", "pawn2", etc.
+		table.insert(pieces, {
+			Name = "Pawn",
+			X = i,
+			Y = 7,
+			O = Player.TWO
+		});
+	end
+
+	return pieces
+end
+
+-- sets up pieces for both players
 local function setup(board)
-	local origin = CFrame.new(board.Position)
-	local pieces = {}
+	-- seems to be a 3d coordinate of some sort
+	-- local origin = CFrame.new(board.Position)
+
+	-- an array of all the pieces on the board
+	-- except we're using a dictionary
+	local pieces = getNewBoard()
+	-- variable that stores if the game is not over
 	local gameended = false
-	pieces["King1"] = {}
-	pieces["King1"].K = game.ReplicatedStorage.Pieces.King:Clone()
-	pieces["King1"].X = 5
-	pieces["King1"].Y = 1
-	pieces["King1"].P = 1
-	pieces["King1"].O = 1
-	pieces["Gold1"] = {}
-	pieces["Gold1"].K = game.ReplicatedStorage.Pieces.Gold:Clone()
-	pieces["Gold1"].X = 4
-	pieces["Gold1"].Y = 1
-	pieces["Gold1"].P = 1
-	pieces["Gold1"].O = 1
-	pieces["Gold2"] = {}
-	pieces["Gold2"].K = game.ReplicatedStorage.Pieces.Gold:Clone()
-	pieces["Gold2"].X = 6
-	pieces["Gold2"].Y = 1
-	pieces["Gold2"].P = 1
-	pieces["Gold2"].O = 1
-	pieces["Silver1"] = {}
-	pieces["Silver1"].K = game.ReplicatedStorage.Pieces.Silver:Clone()
-	pieces["Silver1"].X = 3
-	pieces["Silver1"].Y = 1
-	pieces["Silver1"].P = 1
-	pieces["Silver1"].O = 1
-	pieces["Silver2"] = {}
-	pieces["Silver2"].K = game.ReplicatedStorage.Pieces.Silver:Clone()
-	pieces["Silver2"].X = 7
-	pieces["Silver2"].Y = 1
-	pieces["Silver2"].P = 1
-	pieces["Silver2"].O = 1
-	pieces["Knight1"] = {}
-	pieces["Knight1"].K = game.ReplicatedStorage.Pieces.Knight:Clone()
-	pieces["Knight1"].X = 2
-	pieces["Knight1"].Y = 1
-	pieces["Knight1"].P = 1
-	pieces["Knight1"].O = 1
-	pieces["Knight2"] = {}
-	pieces["Knight2"].K = game.ReplicatedStorage.Pieces.Knight:Clone()
-	pieces["Knight2"].X = 8
-	pieces["Knight2"].Y = 1
-	pieces["Knight2"].P = 1
-	pieces["Knight2"].O = 1
-	pieces["Lance1"] = {}
-	pieces["Lance1"].K = game.ReplicatedStorage.Pieces.Lance:Clone()
-	pieces["Lance1"].X = 1
-	pieces["Lance1"].Y = 1
-	pieces["Lance1"].P = 1
-	pieces["Lance1"].O = 1
-	pieces["Lance2"] = {}
-	pieces["Lance2"].K = game.ReplicatedStorage.Pieces.Lance:Clone()
-	pieces["Lance2"].X = 9
-	pieces["Lance2"].Y = 1
-	pieces["Lance2"].P = 1
-	pieces["Lance2"].O = 1
-	pieces["Rook1"] = {}
-	pieces["Rook1"].K = game.ReplicatedStorage.Pieces.Rook:Clone()
-	pieces["Rook1"].X = 8
-	pieces["Rook1"].Y = 2
-	pieces["Rook1"].P = 1
-	pieces["Rook1"].O = 1
-	pieces["Bishop1"] = {}
-	pieces["Bishop1"].K = game.ReplicatedStorage.Pieces.Bishop:Clone()
-	pieces["Bishop1"].X = 2
-	pieces["Bishop1"].Y = 2
-	pieces["Bishop1"].P = 1
-	pieces["Bishop1"].O = 1
-	for i = 1, 9 do
-		pieces["Pawn"..i] = {}
-		pieces["Pawn"..i].K = game.ReplicatedStorage.Pieces.Pawn:Clone()
-		pieces["Pawn"..i].X = i
-		pieces["Pawn"..i].Y = 3
-		pieces["Pawn"..i].P = 1
-		pieces["Pawn"..i].O = 1
-	end
-	--player 2
-	pieces["King2"] = {}
-	pieces["King2"].K = game.ReplicatedStorage.Pieces.Jewel:Clone()
-	pieces["King2"].X = 5
-	pieces["King2"].Y = 9
-	pieces["King2"].P = 1
-	pieces["King2"].O = -1
-	pieces["Gold3"] = {}
-	pieces["Gold3"].K = game.ReplicatedStorage.Pieces.Gold:Clone()
-	pieces["Gold3"].X = 4
-	pieces["Gold3"].Y = 9
-	pieces["Gold3"].P = 1
-	pieces["Gold3"].O = -1
-	pieces["Gold4"] = {}
-	pieces["Gold4"].K = game.ReplicatedStorage.Pieces.Gold:Clone()
-	pieces["Gold4"].X = 6
-	pieces["Gold4"].Y = 9
-	pieces["Gold4"].P = 1
-	pieces["Gold4"].O = -1
-	pieces["Silver3"] = {}
-	pieces["Silver3"].K = game.ReplicatedStorage.Pieces.Silver:Clone()
-	pieces["Silver3"].X = 3
-	pieces["Silver3"].Y = 9
-	pieces["Silver3"].P = 1
-	pieces["Silver3"].O = -1
-	pieces["Silver4"] = {}
-	pieces["Silver4"].K = game.ReplicatedStorage.Pieces.Silver:Clone()
-	pieces["Silver4"].X = 7
-	pieces["Silver4"].Y = 9
-	pieces["Silver4"].P = 1
-	pieces["Silver4"].O = -1
-	pieces["Knight3"] = {}
-	pieces["Knight3"].K = game.ReplicatedStorage.Pieces.Knight:Clone()
-	pieces["Knight3"].X = 2
-	pieces["Knight3"].Y = 9
-	pieces["Knight3"].P = 1
-	pieces["Knight3"].O = -1
-	pieces["Knight4"] = {}
-	pieces["Knight4"].K = game.ReplicatedStorage.Pieces.Knight:Clone()
-	pieces["Knight4"].X = 8
-	pieces["Knight4"].Y = 9
-	pieces["Knight4"].P = 1
-	pieces["Knight4"].O = -1
-	pieces["Lance3"] = {}
-	pieces["Lance3"].K = game.ReplicatedStorage.Pieces.Lance:Clone()
-	pieces["Lance3"].X = 1
-	pieces["Lance3"].Y = 9
-	pieces["Lance3"].P = 1
-	pieces["Lance3"].O = -1
-	pieces["Lance4"] = {}
-	pieces["Lance4"].K = game.ReplicatedStorage.Pieces.Lance:Clone()
-	pieces["Lance4"].X = 9
-	pieces["Lance4"].Y = 9
-	pieces["Lance4"].P = 1
-	pieces["Lance4"].O = -1
-	pieces["Rook2"] = {}
-	pieces["Rook2"].K = game.ReplicatedStorage.Pieces.Rook:Clone()
-	pieces["Rook2"].X = 2
-	pieces["Rook2"].Y = 8
-	pieces["Rook2"].P = 1
-	pieces["Rook2"].O = -1
-	pieces["Bishop2"] = {}
-	pieces["Bishop2"].K = game.ReplicatedStorage.Pieces.Bishop:Clone()
-	pieces["Bishop2"].X = 8
-	pieces["Bishop2"].Y = 8
-	pieces["Bishop2"].P = 1
-	pieces["Bishop2"].O = -1
-	for i = 1, 9 do
-		pieces["Pawn"..i+9] = {}
-		pieces["Pawn"..i+9].K = game.ReplicatedStorage.Pieces.Pawn:Clone()
-		pieces["Pawn"..i+9].X = i
-		pieces["Pawn"..i+9].Y = 7
-		pieces["Pawn"..i+9].P = 1
-		pieces["Pawn"..i+9].O = -1
-	end
-	local gamestarted = true
-	local player1 = nil
-	board.Pillow1.BillboardGui.TextLabel.Text = "Empty"
-	local bot1 = false
-	board.Bot1.Color = Color3.new(1,0,0)
-	board.Bot1.SurfaceGui.TextLabel.Text = "Bot: Off"
-	local player2 = nil
-	board.Pillow2.BillboardGui.TextLabel.Text = "Empty"
-	local bot2 = false
-	board.Bot2.Color = Color3.new(1,0,0)
-	board.Bot2.SurfaceGui.TextLabel.Text = "Bot: Off"
+
+	-- local player1 = nil
+	-- board.Pillow1.BillboardGui.TextLabel.Text = "Empty"
+	-- local bot1 = false
+	-- board.Bot1.Color = Color3.new(1, 0, 0)
+	-- board.Bot1.SurfaceGui.TextLabel.Text = "Bot: Off"
+
+	-- local player2 = nil
+	-- board.Pillow2.BillboardGui.TextLabel.Text = "Empty"
+	-- local bot2 = false
+	-- board.Bot2.Color = Color3.new(1, 0, 0)
+	-- board.Bot2.SurfaceGui.TextLabel.Text = "Bot: Off"
+
+	-- ?????????
 	local cool = false
-	local turn = -1
-	board.BillboardGui.TextLabel.Text = "Player 1's Turn"
-	board.Selected.Position = Vector3.new(0, -3.2, 17.5) + origin.p
-	board.Pillow1.ClickDetector.MouseClick:Connect(function(player)
-		if gameended == true then return end
-		if player1 then
-			player1 = game.Players:FindFirstChild(player1.Name)
-		end
-		if player2 then
-			player2 = game.Players:FindFirstChild(player2.Name)
-		end
-		if player1 == nil then
-			player1 = player
-		elseif player1 == player then
-			player1 = nil
-		end
-		if player1 or bot1 == true then
-			if player2 or bot2 == true then
-				gamestarted = true
-			end
-		end
-		if player1 then
-			board.Pillow1.BillboardGui.TextLabel.Text = player1.Name
-		else
-			board.Pillow1.BillboardGui.TextLabel.Text = "Empty"
-		end
-	end)
-	board.Pillow2.ClickDetector.MouseClick:Connect(function(player)
-		if gameended == true then return end
-		if player1 then
-			player1 = game.Players:FindFirstChild(player1.Name)
-		end
-		if player2 then
-			player2 = game.Players:FindFirstChild(player2.Name)
-		end
-		if player2 == nil then
-			player2 = player
-		elseif player2 == player then
-			player2 = nil
-		end
-		if player1 or bot1 == true then
-			if player2 or bot2 == true then
-				gamestarted = true
-			end
-		end
-		if player2 then
-			board.Pillow2.BillboardGui.TextLabel.Text = player2.Name
-		else
-			board.Pillow2.BillboardGui.TextLabel.Text = "Empty"
-		end
-	end)
-	board.Bot1.ClickDetector.MouseClick:Connect(function(player)
-		if gameended == true then return end
-		if player1 == nil or player1 == player then
-			if bot1 == true then
-				bot1 = false
-				board.Bot1.Color = Color3.new(1,0,0)
-				board.Bot1.SurfaceGui.TextLabel.Text = "Bot: Off"
-			else
-				bot1 = true
-				board.Bot1.Color = Color3.new(0,1,0)
-				board.Bot1.SurfaceGui.TextLabel.Text = "Bot: On"
-			end
-		end
-	end)
-	board.Bot2.ClickDetector.MouseClick:Connect(function(player)
-		if gameended == true then return end
-		if player2 == nil or player2 == player then
-			if bot2 == true then
-				bot2 = false
-				board.Bot2.Color = Color3.new(1,0,0)
-				board.Bot2.SurfaceGui.TextLabel.Text = "Bot: Off"
-			else
-				bot2 = true
-				board.Bot2.Color = Color3.new(0,1,0)
-				board.Bot2.SurfaceGui.TextLabel.Text = "Bot: On"
-			end
-		end
-	end)
+
+	local turn = Player.ONE
+
+	-- board.BillboardGui.TextLabel.Text = "Player 1's Turn"
+	-- board.Selected.Position = Vector3.new(0, -3.2, 17.5) + origin.p
+
+	-- if bot is clicked, light up with an indicator and show that bot is on,
+	-- for both players
+
+	-- checks if there is a piece at the current location, given a location (x,
+	-- y) and an array of pieces
 	local function something(location, newtable)
 		local pieces = newtable or pieces
-		for i, v in pairs(pieces) do
+		for _, v in pairs(pieces) do
 			if v.X == location.X and v.Y == location.Y then
 				return v
 			end
 		end
 	end
-	local function findavailable(piece, newtable)
+
+	-- probably find all places we can move
+	local function findavailable(pieceName, newtable)
+		-- board of current pieces
 		local pieces = newtable or pieces
-		local call = pieces[piece]
+
+		-- location of piece
+		local call = pieces[pieceName]
+		-- we should never need this
 		if call == nil then return end
+
 		local available = {}
+		-- if we've clicked outside of the arena?
 		if call.X == 0 or call.Y == 0 then
-			for i = 1, 9 do
+			-- if we're placing a pawn somewhere on the board, check if there is a pawn in that column already
+			for h = 1, 9 do
 				local pawn = false
-				if string.sub(piece, 1, 4) == "Pawn" then
+				if string.sub(pieceName, 1, 4) == "Pawn" then
 					for v = 1, 9 do
-						local tab = {}
-						tab.X = i
-						tab.Y = v
-						local spot = something(tab, newtable)
+						-- tab is all coordinates of the board
+						local location = {}
+						location.X = h
+						location.Y = v
+
+						-- if there is a spot on the table for this location
+						local spot = something(location, newtable)
+
 						if spot then
-							if spot.O == call.O and spot.K.Name == "Pawn" and spot.P == 1 then
+							if spot.O == call.O and spot.Name == "Pawn" and spot.P == 1 then
 								pawn = true
+								break
 							end
 						end
 					end
 				end
+				-- if it's not a pawn
 				if pawn == false then
 					for v = 1, 9 do
+						-- make every spot available
 						local num = #available + 1
-						available[num] = {}
-						available[num].X = i
-						available[num].Y = v
-						
+						available[num] = {
+							X = h,
+							Y = v
+						}
+
 						local spot = something(available[num], newtable)
+
+                        -- unless there's a piece already on there
 						if spot then
 							available[num] = nil
-						elseif string.sub(piece, 1, 4) == "Pawn" or string.sub(piece, 1, 5) == "Lance" or string.sub(piece, 1, 6) == "Knight" then
+						elseif string.sub(pieceName, 1, 4) == "Pawn" or string.sub(pieceName, 1, 5) == "Lance" or string.sub(pieceName, 1, 6) == "Knight" then
+							-- ????????????
 							if call.O * 4 + 5 == v then
 								available[num] = nil
-							elseif call.O * 3 + 5 == v and string.sub(piece, 1, 6) == "Knight" then
+							elseif call.O * 3 + 5 == v and string.sub(pieceName, 1, 6) == "Knight" then
 								available[num] = nil
 							end
 						end
@@ -294,6 +282,7 @@ local function setup(board)
 				end
 			end
 		else
+			-- promotion?
 			local pawn = false
 			local front = false
 			local knight = false
@@ -302,13 +291,15 @@ local function setup(board)
 			local lance = false
 			local rook = false
 			local bishop = false
-			if string.sub(piece, 1, 4) == "Pawn" then
+			-- if it's pawn promote to gold
+			if string.sub(pieceName, 1, 4) == "Pawn" then
 				pawn = true
 				if call.P == 2 then
 					front = true
 					gold = true
 				end
-			elseif string.sub(piece, 1, 5) == "Lance" then
+			-- if it's lance promote to gold
+			elseif string.sub(pieceName, 1, 5) == "Lance" then
 				if call.P == 2 then
 					pawn = true
 					front = true
@@ -316,7 +307,8 @@ local function setup(board)
 				else
 					lance = true
 				end
-			elseif string.sub(piece, 1, 6) == "Knight" then
+			-- if it's knight promote to gold
+			elseif string.sub(pieceName, 1, 6) == "Knight" then
 				if call.P == 2 then
 					pawn = true
 					front = true
@@ -324,7 +316,8 @@ local function setup(board)
 				else
 					knight = true
 				end
-			elseif string.sub(piece, 1, 6) == "Silver" then
+			-- if it's silver promote to gold
+			elseif string.sub(pieceName, 1, 6) == "Silver" then
 				pawn = true
 				front = true
 				if call.P == 2 then
@@ -332,23 +325,25 @@ local function setup(board)
 				else
 					silver = true
 				end
-			elseif string.sub(piece, 1, 4) == "Gold" then
+			-- if it's gold promote to gold
+			elseif string.sub(pieceName, 1, 4) == "Gold" then
 				pawn = true
 				front = true
 				gold = true
-			elseif string.sub(piece, 1, 4) == "King" then
+			-- if it's gold promote to gold
+			elseif string.sub(pieceName, 1, 4) == "King" then
 				pawn = true
 				front = true
 				gold = true
 				silver = true
-			elseif string.sub(piece, 1, 4) == "Rook" then
+			elseif string.sub(pieceName, 1, 4) == "Rook" then
 				lance = true
 				rook = true
 				if call.P == 2 then
 					front = true
 					silver = true
 				end
-			elseif string.sub(piece, 1, 6) == "Bishop" then
+			elseif string.sub(pieceName, 1, 6) == "Bishop" then
 				bishop = true
 				if call.P == 2 then
 					pawn = true
@@ -674,6 +669,7 @@ local function setup(board)
 		end
 		return available
 	end
+
 	local function check(piece, newtable)
 		local pieces = newtable or pieces
 		local call = pieces[piece]
@@ -691,6 +687,7 @@ local function setup(board)
 		end
 		return check
 	end
+
 	local function moves(piece, newtable)
 		local pieces = newtable or pieces
 		local call = pieces[piece]
@@ -725,14 +722,15 @@ local function setup(board)
 				check1 = check("King2", newtable)
 			end
 			if check1 == false then
-				newavailable[#newavailable+1] = available[i]
+				newavailable[#newavailable + 1] = available[i]
 			end
 		end
 		return newavailable
 	end
+
 	for i, v in pairs(pieces) do
 		v.K.Parent = game.Workspace.Pieces
-		v.K.CFrame = origin * CFrame.new(12.5-2.5*v.X,1.6,2.5 * v.Y - 12.5) * CFrame.Angles(0,math.pi/2*v.O, math.pi/36)
+		v.K.CFrame = origin * CFrame.new(12.5 - 2.5 * v.X, 1.6, 2.5 * v.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * v.O, math.pi / 36)
 		v.K.ClickDetector.MouseClick:Connect(function(player)
 			if cool == true then return end
 			if gameended == true then return end
@@ -761,31 +759,31 @@ local function setup(board)
 				if spot then
 					if spot.O ~= call.O then
 						local goal = {}
-						goal.CFrame = origin * CFrame.new(12.5-2.5*spot.X,5,2.5 * spot.Y - 12.5) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+						goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						spot.X = 0
 						spot.Y = 0
 						spot.P = 1
 						spot.O = call.O
 						wait(0.75)
-						goal.CFrame = origin * CFrame.new(-16*spot.O, 5, -7.5*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+						goal.CFrame = origin * CFrame.new(-16 * spot.O, 5, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						wait(0.5)
 						if spot.K.Name == "Pawn" then
-							local ran = math.random(1,3)-2
-							goal.CFrame = origin * CFrame.new((-16+ran*2.5)*spot.O, 0.306, -5*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							local ran = math.random(1, 3) - 2
+							goal.CFrame = origin * CFrame.new((-16 + ran * 2.5) * spot.O, 0.306, -5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Lance" then
-							goal.CFrame = origin * CFrame.new(-13.5*spot.O, 0.306, -7.5*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Knight" then
-							goal.CFrame = origin * CFrame.new(-16*spot.O, 0.306, -7.5*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Silver" then
-							goal.CFrame = origin * CFrame.new(-18.5*spot.O, 0.306, -7.5*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Gold" then
-							goal.CFrame = origin * CFrame.new(-13.5*spot.O, 0.306, -10*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Bishop" then
-							goal.CFrame = origin * CFrame.new(-16*spot.O, 0.306, -10*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						elseif spot.K.Name == "Rook" then
-							goal.CFrame = origin * CFrame.new(-18.5*spot.O, 0.306, -10*spot.O) * CFrame.Angles(0,math.pi/2*spot.O, math.pi/36)
+							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
 						end
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						wait(0.5)
@@ -805,11 +803,11 @@ local function setup(board)
 				end
 				local goal = {}
 				if oldx == 0 then
-					goal.CFrame = origin * CFrame.new(-16*call.O, 5, -7.5*call.O) * CFrame.Angles(0,math.pi/2*call.O, math.pi/36)
+					goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
 					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
 					wait(0.75)
 				elseif string.sub(piece, 1, 6) == "Knight" and call.P == 1 then
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,5,2.5 * call.Y - 12.5) * CFrame.Angles(0,math.pi/2*call.O, math.pi/36)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
 					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
 					wait(0.75)
 				end
@@ -823,33 +821,33 @@ local function setup(board)
 					end
 				end
 				if oldp == 2 then
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,1.6,2.5 * call.Y - 12.5) * CFrame.Angles(0,-math.pi/2*call.O, math.pi)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
 				else
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,1.6,2.5 * call.Y - 12.5) * CFrame.Angles(0,math.pi/2*call.O, math.pi/36)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
 				end
 				tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
 				wait(0.5)
 				if oldp == 1 and call.P == 2 then
 					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,5,2.5 * call.Y - 12.5) * CFrame.Angles(0,-math.pi/2*call.O, math.pi)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
 					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
 					wait(0.75)
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,5,2.5 * call.Y - 12.5) * CFrame.Angles(0,-math.pi/2*call.O, math.pi)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
 					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
 					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5-2.5*call.X,1.6,2.5 * call.Y - 12.5) * CFrame.Angles(0,-math.pi/2*call.O, math.pi)
+					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
 					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
 					wait(0.25)
 				end
 				turn = turn * -1
 				local addon = ""
-				local player = turn/2 + 1.5
-				local check = check("King"..player)
+				local player = turn / 2 + 1.5
+				local check = check("King" .. player)
 				if check == true then
 					addon = "Check - "
 				end
-				board.BillboardGui.TextLabel.Text = addon.."Player "..player.."'s Turn"
-				board.Selected.Position = Vector3.new(0, -3.2, -17.5*turn) + origin.p
+				board.BillboardGui.TextLabel.Text = addon .. "Player " .. player .. "'s Turn"
+				board.Selected.Position = Vector3.new(0, -3.2, -17.5 * turn) + origin.p
 				local numofmoves = 0
 				for i, v in pairs(pieces) do
 					if v.O == turn then
@@ -858,13 +856,14 @@ local function setup(board)
 					end
 				end
 				if numofmoves == 0 then
-					board.BillboardGui.TextLabel.Text = "Checkmate - Player "..player.." Wins"
+					board.BillboardGui.TextLabel.Text = "Checkmate - Player " .. player .. " Wins"
 					gameended = true
 				end
 			end
 		end
 		cool = false
 	end
+
 	delay(0, function()
 		while gameended == false do
 			local bot = false
@@ -876,7 +875,7 @@ local function setup(board)
 			if bot == true then
 				local piecetomove = {}
 				local move = {}
-				local movevalue = math.huge*-1
+				local movevalue = math.huge * -1
 				for i, v in pairs(pieces) do
 					if v.O == turn then
 						local available = moves(i)
@@ -1043,20 +1042,20 @@ local function setup(board)
 		movepiece(plr, piece, x, y, promote)
 	end)
 	local plr1time = 0
-	board.Timer1.SurfaceGui.TextLabel.Text = "Time: "..math.floor(plr1time)
+	board.Timer1.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr1time)
 	local plr2time = 0
-	board.Timer2.SurfaceGui.TextLabel.Text = "Time: "..math.floor(plr2time)
+	board.Timer2.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr2time)
 	repeat
 		wait(0.1)
 		if turn == -1 then
 			if player1 ~= nil or bot1 == true then
 				plr1time = plr1time + 0.1
-				board.Timer1.SurfaceGui.TextLabel.Text = "Time: "..math.floor(plr1time)
+				board.Timer1.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr1time)
 			end
 		elseif turn == 1 then
 			if player2 ~= nil or bot2 == true then
 				plr2time = plr2time + 0.1
-				board.Timer2.SurfaceGui.TextLabel.Text = "Time: "..math.floor(plr2time)
+				board.Timer2.SurfaceGui.TextLabel.Text = "Time: " .. math.floor(plr2time)
 			end
 		end
 	until gameended == true
@@ -1065,6 +1064,7 @@ local function setup(board)
 		v.K:Destroy()
 	end
 end
+
 local chil = game.Workspace.Boards:GetChildren()
 for i = 1, #chil do
 	delay(0, function()
