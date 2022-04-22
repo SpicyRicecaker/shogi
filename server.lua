@@ -3,6 +3,11 @@ Player = {
 	TWO = -1
 }
 
+Rank = {
+	Normal = 1,
+	Promoted = 2
+}
+
 local function swapPlayer(player)
 	return player * -1
 end
@@ -21,67 +26,67 @@ local function getNewBoard()
 		Name = "King",
 		X = 5,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Gold",
 		X = 4,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Gold",
 		X = 6,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Silver",
 		X = 3,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Silver",
 		X = 7,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Knight",
 		X = 2,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Knight",
 		X = 8,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Lance",
 		X = 1,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Lance",
 		X = 9,
 		Y = 1,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Rook",
 		X = 8,
 		Y = 2,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	{
 		Name = "Bishop",
 		X = 2,
 		Y = 2,
-		O = Player.ONE
+		Owner = Player.ONE
 	},
 	}
 
@@ -91,7 +96,7 @@ local function getNewBoard()
 			Name = "Pawn",
 			X = i,
 			Y = 3,
-			O = Player.ONE
+			Owner = Player.ONE
 		});
 	end
 
@@ -99,67 +104,67 @@ local function getNewBoard()
 		Name = "King",
 		X = 5,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Gold",
 		X = 4,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Gold",
 		X = 6,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Silver",
 		X = 3,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Silver",
 		X = 7,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Knight",
 		X = 2,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Knight",
 		X = 8,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Lance",
 		X = 1,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Lance",
 		X = 9,
 		Y = 9,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Rook",
 		X = 2,
 		Y = 8,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	{
 		Name = "Bishop",
 		X = 8,
 		Y = 8,
-		O = Player.TWO
+		Owner = Player.TWO
 	},
 	}
 
@@ -169,8 +174,12 @@ local function getNewBoard()
 			Name = "Pawn",
 			X = i,
 			Y = 7,
-			O = Player.TWO
+			Owner = Player.TWO
 		});
+	end
+
+	for piece in pieces do
+		piece.Rank = Rank.Normal
 	end
 
 	return pieces
@@ -248,7 +257,7 @@ local function setup(board)
 						local spot = something(location, newtable)
 
 						if spot then
-							if spot.O == call.O and spot.Name == "Pawn" and spot.P == 1 then
+							if spot.Owner == call.Owner and spot.Name == "Pawn" and spot.P == 1 then
 								pawn = true
 								break
 							end
@@ -272,9 +281,9 @@ local function setup(board)
 							available[num] = nil
 						elseif string.sub(pieceName, 1, 4) == "Pawn" or string.sub(pieceName, 1, 5) == "Lance" or string.sub(pieceName, 1, 6) == "Knight" then
 							-- ????????????
-							if call.O * 4 + 5 == v then
+							if call.Owner * 4 + 5 == v then
 								available[num] = nil
-							elseif call.O * 3 + 5 == v and string.sub(pieceName, 1, 6) == "Knight" then
+							elseif call.Owner * 3 + 5 == v and string.sub(pieceName, 1, 6) == "Knight" then
 								available[num] = nil
 							end
 						end
@@ -282,7 +291,7 @@ local function setup(board)
 				end
 			end
 		else
-			-- promotion?
+			-- defines movement patterns for various pieces, depending on their promotion level
 			local pawn = false
 			local front = false
 			local knight = false
@@ -291,46 +300,40 @@ local function setup(board)
 			local lance = false
 			local rook = false
 			local bishop = false
-			-- if it's pawn promote to gold
 			if string.sub(pieceName, 1, 4) == "Pawn" then
 				pawn = true
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					front = true
 					gold = true
 				end
-			-- if it's lance promote to gold
 			elseif string.sub(pieceName, 1, 5) == "Lance" then
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					pawn = true
 					front = true
 					gold = true
 				else
 					lance = true
 				end
-			-- if it's knight promote to gold
 			elseif string.sub(pieceName, 1, 6) == "Knight" then
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					pawn = true
 					front = true
 					gold = true
 				else
 					knight = true
 				end
-			-- if it's silver promote to gold
 			elseif string.sub(pieceName, 1, 6) == "Silver" then
 				pawn = true
 				front = true
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					gold = true
 				else
 					silver = true
 				end
-			-- if it's gold promote to gold
 			elseif string.sub(pieceName, 1, 4) == "Gold" then
 				pawn = true
 				front = true
 				gold = true
-			-- if it's gold promote to gold
 			elseif string.sub(pieceName, 1, 4) == "King" then
 				pawn = true
 				front = true
@@ -339,44 +342,48 @@ local function setup(board)
 			elseif string.sub(pieceName, 1, 4) == "Rook" then
 				lance = true
 				rook = true
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					front = true
 					silver = true
 				end
 			elseif string.sub(pieceName, 1, 6) == "Bishop" then
 				bishop = true
-				if call.P == 2 then
+				if call.Rank == Rank.Promoted then
 					pawn = true
 					gold = true
 				end
 			end
+
+			-- pawn movement?
 			if pawn == true then
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X
-				available[num].Y = call.Y + 1 * call.O
+				available[num].Y = call.Y + 1 * call.Owner
+
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
 				end
 			end
+
 			if front == true then
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X - 1
-				available[num].Y = call.Y + 1 * call.O
+				available[num].Y = call.Y + 1 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -384,29 +391,30 @@ local function setup(board)
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X + 1
-				available[num].Y = call.Y + 1 * call.O
+				available[num].Y = call.Y + 1 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
 				end
 			end
+
 			if knight == true then
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X - 1
-				available[num].Y = call.Y + 2 * call.O
+				available[num].Y = call.Y + 2 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -414,13 +422,13 @@ local function setup(board)
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X + 1
-				available[num].Y = call.Y + 2 * call.O
+				available[num].Y = call.Y + 2 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -430,13 +438,13 @@ local function setup(board)
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X - 1
-				available[num].Y = call.Y - 1 * call.O
+				available[num].Y = call.Y - 1 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -444,13 +452,13 @@ local function setup(board)
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X + 1
-				available[num].Y = call.Y - 1 * call.O
+				available[num].Y = call.Y - 1 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -466,7 +474,7 @@ local function setup(board)
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -480,7 +488,7 @@ local function setup(board)
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -488,13 +496,13 @@ local function setup(board)
 				local num = #available + 1
 				available[num] = {}
 				available[num].X = call.X
-				available[num].Y = call.Y - 1 * call.O
+				available[num].Y = call.Y - 1 * call.Owner
 				if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 					available[num] = nil
 				else
 					local spot = something(available[num], newtable)
 					if spot then
-						if spot.O == call.O then
+						if spot.Owner == call.Owner then
 							available[num] = nil
 						end
 					end
@@ -507,14 +515,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X
-						available[num].Y = call.Y + i * call.O
+						available[num].Y = call.Y + i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -529,14 +537,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X
-						available[num].Y = call.Y - i * call.O
+						available[num].Y = call.Y - i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -556,7 +564,7 @@ local function setup(board)
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -576,7 +584,7 @@ local function setup(board)
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -591,14 +599,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X - i
-						available[num].Y = call.Y - i * call.O
+						available[num].Y = call.Y - i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -611,14 +619,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X + i
-						available[num].Y = call.Y - i * call.O
+						available[num].Y = call.Y - i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -631,14 +639,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X - i
-						available[num].Y = call.Y + i * call.O
+						available[num].Y = call.Y + i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -651,14 +659,14 @@ local function setup(board)
 						local num = #available + 1
 						available[num] = {}
 						available[num].X = call.X + i
-						available[num].Y = call.Y + i * call.O
+						available[num].Y = call.Y + i * call.Owner
 						if available[num].X > 9 or available[num].X < 1 or available[num].Y > 9 or available[num].Y < 1 then
 							available[num] = nil
 						else
 							local spot = something(available[num], newtable)
 							if spot then
 								hit = true
-								if spot.O == call.O then
+								if spot.Owner == call.Owner then
 									available[num] = nil
 								end
 							end
@@ -676,7 +684,7 @@ local function setup(board)
 		if call == nil then return end
 		local check = false
 		for i, v in pairs(pieces) do
-			if v.O == call.O * -1 then
+			if v.Owner == call.Owner * -1 then
 				local spot = findavailable(i, newtable)
 				for c = 1, #spot do
 					if spot[c].X == call.X and spot[c].Y == call.Y then
@@ -698,27 +706,26 @@ local function setup(board)
 			local newtable = {}
 			for i, v in pairs(pieces) do
 				newtable[i] = {}
-				newtable[i].K = v.K
 				newtable[i].X = v.X
 				newtable[i].Y = v.Y
 				newtable[i].P = v.P
-				newtable[i].O = v.O
+				newtable[i].Owner = v.Owner
 			end
 			local spot = something(available[i], newtable)
 			if spot then
-				if spot.O ~= call.O then
+				if spot.Owner ~= call.Owner then
 					spot.X = 0
 					spot.Y = 0
 					spot.P = 1
-					spot.O = call.O
+					spot.Owner = call.Owner
 				end
 			end
 			newtable[piece].X = available[i].X
 			newtable[piece].Y = available[i].Y
 			local check1 = nil
-			if call.O == 1 then
+			if call.Owner == Player.ONE then
 				check1 = check("King1", newtable)
-			elseif call.O == -1 then
+			elseif call.Owner == Player.TWO then
 				check1 = check("King2", newtable)
 			end
 			if check1 == false then
@@ -734,7 +741,7 @@ local function setup(board)
 		v.K.ClickDetector.MouseClick:Connect(function(player)
 			if cool == true then return end
 			if gameended == true then return end
-			if v.O == turn then
+			if v.Owner == turn then
 				local available = moves(i)
 				game.ReplicatedStorage.RemoteEvent:FireClient(player, i, "place", available, v, board)
 			else
@@ -746,7 +753,7 @@ local function setup(board)
 		if gameended == true then return end
 		local call = pieces[piece]
 		if call == nil then return end
-		if turn ~= call.O then return end
+		if turn ~= call.Owner then return end
 		if cool == true then return end
 		cool = true
 		if call.X == 0 or call.Y == 0 then
@@ -757,34 +764,34 @@ local function setup(board)
 			if available[i].X == x and available[i].Y == y then
 				local spot = something(available[i])
 				if spot then
-					if spot.O ~= call.O then
+					if spot.Owner ~= call.Owner then
 						local goal = {}
-						goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.Owner, math.pi / 36)
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						spot.X = 0
 						spot.Y = 0
 						spot.P = 1
-						spot.O = call.O
+						spot.Owner = call.Owner
 						wait(0.75)
-						goal.CFrame = origin * CFrame.new(-16 * spot.O, 5, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						goal.CFrame = origin * CFrame.new(-16 * spot.Owner, 5, -7.5 * spot.Owner) * CFrame.Angles(0, math.pi / 2 * spot.Owner, math.pi / 36)
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						wait(0.5)
-						if spot.K.Name == "Pawn" then
-							local ran = math.random(1, 3) - 2
-							goal.CFrame = origin * CFrame.new((-16 + ran * 2.5) * spot.O, 0.306, -5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Lance" then
-							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Knight" then
-							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Silver" then
-							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Gold" then
-							goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Bishop" then
-							goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						elseif spot.K.Name == "Rook" then
-							goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
-						end
+						-- if spot.K.Name == "Pawn" then
+						-- 	local ran = math.random(1, 3) - 2
+						-- 	goal.CFrame = origin * CFrame.new((-16 + ran * 2.5) * spot.Owner, 0.306, -5 * spot.Owner) * CFrame.Angles(0, math.pi / 2 * spot.Owner, math.pi / 36)
+						-- elseif spot.K.Name == "Lance" then
+						-- 	goal.CFrame = origin * CFrame.new(-13.5 * spot.Owner, 0.306, -7.5 * spot.Owner) * CFrame.Angles(0, math.pi / 2 * spot.Owner, math.pi / 36)
+						-- elseif spot.K.Name == "Knight" then
+						-- 	goal.CFrame = origin * CFrame.new(-16 * spot.Owner, 0.306, -7.5 * spot.Owner) * CFrame.Angles(0, math.pi / 2 * spot.Owner, math.pi / 36)
+						-- elseif spot.K.Name == "Silver" then
+						-- 	goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.K.Name == "Gold" then
+						-- 	goal.CFrame = origin * CFrame.new(-13.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.K.Name == "Bishop" then
+						-- 	goal.CFrame = origin * CFrame.new(-16 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- elseif spot.K.Name == "Rook" then
+						-- 	goal.CFrame = origin * CFrame.new(-18.5 * spot.O, 0.306, -10 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
+						-- end
 						tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
 						wait(0.5)
 					else
@@ -795,49 +802,49 @@ local function setup(board)
 				local oldp = call.P
 				local oldx = call.X
 				if promote == true and call.K.Name ~= "Gold" and call.K.Name ~= "King" and call.K.Name ~= "Jewel" then
-					if call.O == -1 and call.Y <= 3 then
+					if call.Owner == -1 and call.Y <= 3 then
 						call.P = 2
-					elseif call.O == 1 and call.Y >= 7 then
+					elseif call.Owner == 1 and call.Y >= 7 then
 						call.P = 2
 					end
 				end
 				local goal = {}
 				if oldx == 0 then
-					goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
+					-- goal.CFrame = origin * CFrame.new(-16 * call.O, 5, -7.5 * call.O) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+					-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+					-- wait(0.75)
 				elseif string.sub(piece, 1, 6) == "Knight" and call.P == 1 then
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+					-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+					-- wait(0.75)
 				end
 				call.X = x
 				call.Y = y
 				if promote == true and call.K.Name ~= "Gold" and call.K.Name ~= "King" and call.K.Name ~= "Jewel" then
-					if call.O == -1 and call.Y <= 3 then
-						call.P = 2
-					elseif call.O == 1 and call.Y >= 7 then
-						call.P = 2
+					if call.Owner == Player.TWO and call.Y <= 3 then
+						call.P = Rank.Promoted
+					elseif call.O == Player.ONE and call.Y >= 7 then
+						call.P = Rank.Promoted
 					end
 				end
 				if oldp == 2 then
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
 				else
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * call.O, math.pi / 36)
 				end
 				tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
 				wait(0.5)
 				if oldp == 1 and call.P == 2 then
-					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
-					wait(0.75)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
-					wait(0.25)
-					goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
-					tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
-					wait(0.25)
+					-- wait(0.25)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+					-- tween:Create(call.K, TweenInfo.new(0.5), goal):Play()
+					-- wait(0.75)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 5, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+					-- tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
+					-- wait(0.25)
+					-- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
+					-- tween:Create(call.K, TweenInfo.new(0.25), goal):Play()
+					-- wait(0.25)
 				end
 				turn = turn * -1
 				local addon = ""
@@ -850,7 +857,7 @@ local function setup(board)
 				board.Selected.Position = Vector3.new(0, -3.2, -17.5 * turn) + origin.p
 				local numofmoves = 0
 				for i, v in pairs(pieces) do
-					if v.O == turn then
+					if v.Owner == turn then
 						local available = moves(i)
 						numofmoves = numofmoves + #available
 					end
@@ -877,7 +884,7 @@ local function setup(board)
 				local move = {}
 				local movevalue = math.huge * -1
 				for i, v in pairs(pieces) do
-					if v.O == turn then
+					if v.Owner == turn then
 						local available = moves(i)
 						for c = 1, #available do
 							local moveworth = 0
@@ -918,15 +925,14 @@ local function setup(board)
 							local newtable = {}
 							for i, v in pairs(pieces) do
 								newtable[i] = {}
-								newtable[i].K = v.K
 								newtable[i].X = v.X
 								newtable[i].Y = v.Y
 								newtable[i].P = v.P
-								newtable[i].O = v.O
+								newtable[i].Owner = v.Owner
 							end
 							local spot = something(available[c], newtable)
 							if spot then
-								if spot.O ~= v.O then
+								if spot.Owner ~= v.Owner then
 									if spot.P == 1 then
 										if spot.K.Name == "Pawn" then
 											moveworth = moveworth + 1
@@ -961,7 +967,7 @@ local function setup(board)
 									spot.X = 0
 									spot.Y = 0
 									spot.P = 1
-									spot.O = v.O
+									spot.Owner = v.Owner
 								end
 							end
 							newtable[i].X = available[c].X
@@ -969,7 +975,7 @@ local function setup(board)
 							wait()
 							local check = false
 							for b, n in pairs(pieces) do
-								if n.O == v.O * -1 then
+								if n.Owner == v.Owner * -1 then
 									local spot = findavailable(b, newtable)
 									for c = 1, #spot do
 										if spot[c].X == newtable[i].X and spot[c].Y == newtable[i].Y then
