@@ -283,17 +283,23 @@ local function setup(board)
 						-- make every spot available
 
 						local spot = hashmap[h][v];
+
+						-- pieces can only be sent to where they can move one more time (so they can promote)
+
 						-- we can only send knight up to third to last rank
-						-- we can only send all other peaces up second to last rank
+						-- we can only send pawn and lace up to second to last rank
+
+						-- all other pieces can be sent to last row
+
 						if not spot then
-							if pieceName == "Knight" then
-								if pieceInQuestion.O * 3 + 5 ~= v then
+							if pieceName == "Pawn" or pieceName == "Lance" or pieceName == "Knight" then
+								if pieceInQuestion.O * 4 + 5 == v then
+									table.insert(available, { X = h, Y = v })
+								elseif pieceInQuestion.O * 3 + 5 == v and pieceName == "Knight" then
 									table.insert(available, { X = h, Y = v })
 								end
 							else
-								if pieceInQuestion.O * 4 + 5 ~= v then
-									table.insert(available, { X = h, Y = v })
-								end
+								table.insert(available, { X = h, Y = v })
 							end
 						end
 					end
@@ -325,7 +331,7 @@ local function setup(board)
 				-- for lance, dynamically generate a list of dydx at runtime
 			elseif pieceName == "Lance" then
 				if pieceInQuestion.P == Rank.NORMAL then
-					local currentX = pieceInQuestion.X 
+					local currentX = pieceInQuestion.X
 					local currentY = pieceInQuestion.Y + pieceInQuestion.O
 					-- get position of rook in this direction
 					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
@@ -351,7 +357,7 @@ local function setup(board)
 							})
 						end
 
-						currentX = currentX 
+						currentX = currentX
 						currentY = currentY + pieceInQuestion.O
 					end
 				else
@@ -640,6 +646,7 @@ local function setup(board)
 	-- add a listener to every piece
 	for i, v in pairs(pieces) do
 		-- on click
+		-- TODO: attach with love2d's API
 		local function onClick()
 			-- ?????????
 			-- if cool == true then return end
@@ -666,6 +673,7 @@ local function setup(board)
 		local call = pieces[piece]
 		if call == nil then return end
 		if turn ~= call.O then return end
+		-- what is TRUE
 		if cool == true then return end
 		cool = true
 		if call.X == 0 or call.Y == 0 then
