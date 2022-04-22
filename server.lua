@@ -325,15 +325,34 @@ local function setup(board)
 				-- for lance, dynamically generate a list of dydx at runtime
 			elseif pieceName == "Lance" then
 				if pieceInQuestion.P == Rank.NORMAL then
-					if pieceInQuestion.O == Player.ONE then
-						-- might be a bug, we'll see
-						for y = pieceInQuestion.Y + 1, 9, 1 do
-							table.insert(dydxList, { y - pieceInQuestion.Y, 0 })
+					local currentX = pieceInQuestion.X 
+					local currentY = pieceInQuestion.Y + pieceInQuestion.O
+					-- get position of rook in this direction
+					while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
+						local spot = hashmap[currentX][currentY]
+
+						-- if there is a piece in the way, our rook cannot move further
+						if spot then
+							-- check ownership
+							-- if we own, do not include the spot as a valid move
+							if spot.O == pieceInQuestion.O then
+								-- otherwise, add it as a valid move directly into the insert
+								table.insert(available, {
+									X = currentX,
+									Y = currentY
+								})
+							end
+							-- break out
+							break
+						else
+							table.insert(available, {
+								X = currentX,
+								Y = currentY
+							})
 						end
-					else
-						for y = pieceInQuestion.Y - 1, 1, -1 do
-							table.insert(dydxList, { pieceInQuestion.Y - y, 0 })
-						end
+
+						currentX = currentX 
+						currentY = currentY + pieceInQuestion.O
 					end
 				else
 					-- gold movement
