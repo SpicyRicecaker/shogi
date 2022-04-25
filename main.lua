@@ -1,3 +1,18 @@
+-- copied from https://stackoverflow.com/a/27028488/11742422
+-- how illegal is it that this isn't a function in std
+local function dump(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then k = '"' .. k .. '"' end
+            s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
+        end
+        return s .. '} '
+    else
+        return tostring(o)
+    end
+end
+
 -- start the central game loop
 
 Player = {
@@ -89,19 +104,7 @@ local function getNewBoard()
         Y = 2,
         O = Player.ONE
     },
-    }
-
-    for i = 1, 9 do
-        -- "pawn1", "pawn2", etc.
-        table.insert(pieces, {
-            Name = "Pawn",
-            X = i,
-            Y = 3,
-            O = Player.ONE
-        });
-    end
-
-    local pieces = { {
+    {
         Name = "King",
         X = 5,
         Y = 9,
@@ -167,7 +170,18 @@ local function getNewBoard()
         Y = 8,
         O = Player.TWO
     },
+
     }
+
+    for i = 1, 9 do
+        -- "pawn1", "pawn2", etc.
+        table.insert(pieces, {
+            Name = "Pawn",
+            X = i,
+            Y = 3,
+            O = Player.ONE
+        });
+    end
 
     for i = 1, 9 do
         -- "pawn1", "pawn2", etc.
@@ -269,25 +283,14 @@ end
 
 
 -- probably find all places we can move
-local function findavailable(pieceInQuestion, newtable)
-    -- board of current pieces
-    local pieces = newtable or Pieces
-
-    -- we should never need this
-    if pieceInQuestion == nil then return end
-    local pieceName = pieceInQuestion.Name
+local function findavailable(selectedPiece, newBoard)
+    local pieceName = selectedPiece.Name
 
     local available = {}
 
-    -- hashmap, stores existing pieces at their coordinates
-    local hashmap = {}
-    for piece in pieces do
-        hashmap[piece.X][piece.Y] = piece;
-    end
-
     -- potential bug: if it's pawn then there's literally no available squares
     -- if we've clicked outside of the arena?
-    if pieceInQuestion.X == 0 or pieceInQuestion.Y == 0 then
+    if selectedPiece.X == 0 or selectedPiece.Y == 0 then
         -- if we're placing a pawn somewhere on the board, check if there is a pawn in that column already
         for h = 1, 9 do
             local pawn = false
@@ -295,9 +298,9 @@ local function findavailable(pieceInQuestion, newtable)
                 for v = 1, 9 do
                     -- tab is all coordinates of the board
                     -- if there is a spot on the table for this location
-                    local spot = hashmap[h][v]
+                    local spot = GetPieceAt[h][v]
                     if spot then
-                        if spot.O == pieceInQuestion.O and spot.Name == "Pawn" and spot.P == 1 then
+                        if spot.O == selectedPiece.O and spot.Name == "Pawn" and spot.P == 1 then
                             pawn = true
                             break
                         end
@@ -309,7 +312,7 @@ local function findavailable(pieceInQuestion, newtable)
                 for v = 1, 9 do
                     -- make every spot available
 
-                    local spot = hashmap[h][v];
+                    local spot = GetPieceAt[h][v];
 
                     -- pieces can only be sent to where they can move one more time (so they can promote)
 
@@ -320,9 +323,9 @@ local function findavailable(pieceInQuestion, newtable)
 
                     if not spot then
                         if pieceName == "Pawn" or pieceName == "Lance" or pieceName == "Knight" then
-                            if pieceInQuestion.O * 4 + 5 == v then
+                            if selectedPiece.O * 4 + 5 == v then
                                 table.insert(available, { X = h, Y = v })
-                            elseif pieceInQuestion.O * 3 + 5 == v and pieceName == "Knight" then
+                            elseif selectedPiece.O * 3 + 5 == v and pieceName == "Knight" then
                                 table.insert(available, { X = h, Y = v })
                             end
                         else
@@ -333,7 +336,6 @@ local function findavailable(pieceInQuestion, newtable)
             end
         end
     else
-        local block = false
         local dydxList = {}
         -- for ALL pieces, we generate a list of dydx
         -- we iterate over the dydx, and only then do we actually do boundary checking
@@ -344,31 +346,31 @@ local function findavailable(pieceInQuestion, newtable)
 
         -- if it's pawn promote to gold
         if pieceName == "Pawn" then
-            if pieceInQuestion.P == Rank.NORMAL then
-                table.insert(dydxList, { -1 * pieceInQuestion.O, 0 })
+            if selectedPiece.P == Rank.NORMAL then
+                table.insert(dydxList, { selectedPiece.O, 0 })
             else
                 for y = -1, 1 do
                     for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * pieceInQuestion.O, x })
+                            table.insert(dydxList, { y * selectedPiece.O, x })
                         end
                     end
                 end
             end
             -- for lance, dynamically generate a list of dydx at runtime
         elseif pieceName == "Lance" then
-            if pieceInQuestion.P == Rank.NORMAL then
-                local currentX = pieceInQuestion.X
-                local currentY = pieceInQuestion.Y + pieceInQuestion.O
+            if selectedPiece.P == Rank.NORMAL then
+                local currentX = selectedPiece.X
+                local currentY = selectedPiece.Y + selectedPiece.O
                 -- get position of rook in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = hashmap[currentX][currentY]
+                    local spot = GetPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
                         -- check ownership
                         -- if we own, do not include the spot as a valid move
-                        if spot.O == pieceInQuestion.O then
+                        if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
                                 X = currentX,
@@ -385,37 +387,37 @@ local function findavailable(pieceInQuestion, newtable)
                     end
 
                     currentX = currentX
-                    currentY = currentY + pieceInQuestion.O
+                    currentY = currentY + selectedPiece.O
                 end
             else
                 -- gold movement
-                for y in -1, 1 do
-                    for x in -1, 1 do
+                for y = -1, 1 do
+                    for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * pieceInQuestion.O, x })
+                            table.insert(dydxList, { y * selectedPiece.O, x })
                         end
                     end
                 end
             end
             -- if it's knight promote to gold
         elseif pieceName == "Knight" then
-            if pieceInQuestion.P == Rank.NORMAL then
-                for x in { -1, 1 } do
-                    table.insert(dydxList, { 2 * pieceInQuestion.O, x })
+            if selectedPiece.P == Rank.NORMAL then
+                for _, x in ipairs({ -1, 1 }) do
+                    table.insert(dydxList, { 2 * selectedPiece.O, x })
                 end
             else
-                for y in -1, 1 do
-                    for x in -1, 1 do
+                for y = -1, 1 do
+                    for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * pieceInQuestion.O, x })
+                            table.insert(dydxList, { y * selectedPiece.O, x })
                         end
                     end
                 end
             end
             -- if it's silver promote to gold
         elseif pieceName == "Silver" then
-            if pieceInQuestion.P == Rank.NORMAL then
-                for coordinate in {
+            if selectedPiece.P == Rank.NORMAL then
+                for _, coordinate in ipairs({
                     {
                         1, -1
                     }, {
@@ -429,32 +431,32 @@ local function findavailable(pieceInQuestion, newtable)
                     {
                         -1, 1
                     }
-                } do
-                    table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
+                }) do
+                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
                 end
             else
-                for y in -1, 1 do
-                    for x in -1, 1 do
+                for y = -1, 1 do
+                    for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * pieceInQuestion.O, x })
+                            table.insert(dydxList, { y * selectedPiece.O, x })
                         end
                     end
                 end
             end
             -- if it's gold promote to gold
         elseif pieceName == "Gold" then
-            for y in -1, 1 do
-                for x in -1, 1 do
+            for y = -1, 1 do
+                for x = -1, 1 do
                     if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                        table.insert(dydxList, { y * pieceInQuestion.O, x })
+                        table.insert(dydxList, { y * selectedPiece.O, x })
                     end
                 end
             end
             -- if it's gold promote to gold
         elseif pieceName == "King" then
-            for y in -1, 1 do
-                for x in -1, 1 do
-                    table.insert(dydxList, { y * pieceInQuestion.O, x })
+            for y = -1, 1 do
+                for x = -1, 1 do
+                    table.insert(dydxList, { y * selectedPiece.O, x })
                 end
             end
         elseif pieceName == "Rook" then
@@ -467,18 +469,21 @@ local function findavailable(pieceInQuestion, newtable)
             }
 
             -- for each direction
-            for dy, dx in directionsDydx do
-                local currentX = pieceInQuestion.X + dx
-                local currentY = pieceInQuestion.Y + dy
+            for _, dydx in ipairs(directionsDydx) do
+                local dy = dydx[1]
+                local dx = dydx[2]
+
+                local currentX = selectedPiece.X + dx
+                local currentY = selectedPiece.Y + dy
                 -- get position of rook in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = hashmap[currentX][currentY]
+                    local spot = GetPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
                         -- check ownership
                         -- if we own, do not include the spot as a valid move
-                        if spot.O == pieceInQuestion.O then
+                        if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
                                 X = currentX,
@@ -499,8 +504,8 @@ local function findavailable(pieceInQuestion, newtable)
                 end
             end
 
-            if pieceInQuestion.P == Rank.PROMOTED then
-                for coordinate in {
+            if selectedPiece.P == Rank.PROMOTED then
+                for _, coordinate in ipairs({
                     {
                         1, 1
                     }, {
@@ -511,8 +516,8 @@ local function findavailable(pieceInQuestion, newtable)
                     {
                         -1, 1
                     }
-                } do
-                    table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
+                }) do
+                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
                 end
             end
         elseif pieceName == "Bishop" then
@@ -525,18 +530,21 @@ local function findavailable(pieceInQuestion, newtable)
             }
 
             -- for each direction
-            for dy, dx in directionsDydx do
-                local currentX = pieceInQuestion.X + dx
-                local currentY = pieceInQuestion.Y + dy
+            for _, dydx in ipairs(directionsDydx) do
+                local dy = dydx[1]
+                local dx = dydx[2]
+
+                local currentX = selectedPiece.X + dx
+                local currentY = selectedPiece.Y + dy
                 -- get position of bishop in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = hashmap[currentX][currentY]
+                    local spot = GetPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our bishop cannot move further
                     if spot then
                         -- check ownership
                         -- if we own, do not include the spot as a valid move
-                        if spot.O ~= pieceInQuestion.O then
+                        if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
                                 X = currentX,
@@ -557,8 +565,8 @@ local function findavailable(pieceInQuestion, newtable)
                 end
             end
 
-            if pieceInQuestion.P == Rank.PROMOTED then
-                for coordinate in {
+            if selectedPiece.P == Rank.PROMOTED then
+                for _, coordinate in ipairs({
                     {
                         1, 0
                     }, {
@@ -569,25 +577,33 @@ local function findavailable(pieceInQuestion, newtable)
                     {
                         0, 1
                     }
-                } do
-                    table.insert(dydxList, { coordinate[0] * pieceInQuestion.O, coordinate[1] })
+                }) do
+                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
                 end
             end
         end
 
-        for dy, dx in dydxList do
-            local newY = pieceInQuestion.Y + dy
-            local newX = pieceInQuestion.X + dx
+        for _, dydx in ipairs(dydxList) do
+            local dy = dydx[1]
+            local dx = dydx[2]
+
+            local newY = selectedPiece.Y + dy
+            local newX = selectedPiece.X + dx
 
             if not (newY > 9 or newY < 1) and not (newX > 9 or newX < 1) then
-                local spot = hashmap[newX][newY]
+                local spot = GetPieceAt[newX][newY]
                 if spot then
-                    if spot.O ~= pieceInQuestion.O then
+                    if spot.O ~= selectedPiece.O then
                         table.insert(available, {
                             X = newX,
                             Y = newY
                         })
                     end
+                else
+                    table.insert(available, {
+                        X = newX,
+                        Y = newY
+                    })
                 end
             end
         end
@@ -1098,8 +1114,56 @@ function love.load()
     -- now we finally have our origin coordinate. This corresponds to the top left of the board
     Origin = {
         x = PaddingLeft + CenterPaddingLeft,
-        y = PaddingTop -- + CenterPaddingTop,
+        y = PaddingTop + CenterPaddingTop,
     }
+
+    PieceGraphic = {
+        -- i have no idea if this is the right kanji for each piece but we're
+        -- rolling with it
+        -- https://shogi.fandom.com/wiki/Pieces
+        [Rank.NORMAL] = {
+            King = "玉",
+            Gold = "金",
+            Silver = "銀",
+            Knight = "桂",
+            Lance = "香",
+            Rook = "飛",
+            Bishop = "角",
+            Pawn = "歩"
+        },
+        [Rank.PROMOTED] = {
+            King = "玉",
+            Gold = "金",
+            Silver = "全",
+            Knight = "今",
+            Lance = "杏",
+            Rook = "竜",
+            Bishop = "馬",
+            Pawn = "と"
+        }
+    }
+
+    -- load default japanese font
+    PieceFont = love.graphics.newFont("res/YujiBoku-Regular.ttf", 40)
+
+    -- Player turn
+    Turn = Player.ONE
+
+    -- Global register for pieces at any location
+
+    -- hashmap, stores existing references to pieces at their coordinates
+    -- Must be updated (via recomputation) every time someone moves
+    GetPieceAt = {}
+    for _, piece in ipairs(Pieces) do
+        if not GetPieceAt[piece.X] then
+            GetPieceAt[piece.X] = {}
+        end
+        GetPieceAt[piece.X][piece.Y] = piece;
+    end
+
+    -- Determines what we're rendering?
+    ShowAvailable = false
+    Available = {}
 end
 
 function love.update()
@@ -1107,13 +1171,14 @@ end
 
 function love.draw()
     love.graphics.clear()
+
     -- draw the grid
 
     -- 0 -> 9 inclusive, since we want to draw the left and right edges of the board
 
-    for i=0, 9 do
+    for i = 0, 9 do
         local offset = SquareSideLength * i
-        
+
         -- draw a horizontal line from left to right, incrementing horizontal
         love.graphics.line(Origin.x, Origin.y + offset, Origin.x + BoardLength, Origin.y + offset)
 
@@ -1122,14 +1187,55 @@ function love.draw()
     end
     -- draw the pieces
 
-    -- for _, piece in Pieces do
-        
-    -- end
+    love.graphics.setFont(PieceFont)
+
+    for _, piece in ipairs(Pieces) do
+        -- use our piece graphic to render its place on the grid
+        -- constant offset to the right by 6
+        -- constant offset up by 8
+        -- in order to center the pieces
+        love.graphics.print(PieceGraphic[piece.P][piece.Name], Origin.x + (piece.X - 1) * SquareSideLength + 6, Origin.y + (9 - piece.Y) * SquareSideLength - 8)
+    end
 
     -- draw the available moves
+    if ShowAvailable then
+        for _, square in ipairs(Available) do
+            -- just draw green squares i guess
+            love.graphics.rectangle("fill", Origin.x + (square.X - 1) * SquareSideLength, Origin.y + (9 - square.Y) * SquareSideLength, SquareSideLength, SquareSideLength)
+        end
+    end
     -- probably draw ui here as well
 
     -- for _, value in ipairs(t) do
-        
+
     -- end
+end
+
+function love.mousepressed(x, y, button, istouch)
+    -- https://love2d.org/wiki/love.mousepressed 1 is primary mouse button, 2 is secondary, 3 is scroll wheel
+
+    if button ~= 1 then
+        return
+    end
+    -- check if the mouse click happened within the board
+    if x >= Origin.x and y >= Origin.y and x <= Origin.x + BoardLength and y <= Origin.y + BoardLength then
+        -- calculate index
+        local pieceX = math.floor((x - Origin.x) / SquareSideLength) + 1
+        local pieceY = 9 - math.floor((y - Origin.y) / SquareSideLength)
+
+
+        -- get piece at that location
+        local selectedPiece = GetPieceAt[pieceX][pieceY]
+        -- check if piece's owner belongs to the current turn
+        if not selectedPiece or selectedPiece.O ~= Turn then
+            ShowAvailable = false
+            return
+        end
+        -- populate the available list!
+        ShowAvailable = true
+        Available = findavailable(selectedPiece)
+    else
+        ShowAvailable = false
+    end
+    -- TODO need to take into account the captured pieces later
 end
