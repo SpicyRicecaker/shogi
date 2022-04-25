@@ -220,8 +220,11 @@ local function setupPieces()
     Pieces = getNewBoard()
     -- create a registry for pieces, returns the index of the array
     PieceRegistry = {}
+    -- TODO needs to be rebuilt every time a capture occurs lol
     for idx, piece in ipairs(Pieces) do
-        PieceRegistry[piece.Name] = {}
+        if not PieceRegistry[piece.Name] then
+            PieceRegistry[piece.Name] = {}
+        end
         PieceRegistry[piece.Name][piece.O] = idx
     end
 
@@ -283,10 +286,19 @@ end
 
 
 -- probably find all places we can move
-local function findavailable(selectedPiece, newBoard)
+local function findavailable(selectedPiece, getPieceAt)
     local pieceName = selectedPiece.Name
 
     local available = {}
+
+    -- -- build a cache
+    -- local getPieceAt = {}
+    -- for _, piece in ipairs(Pieces) do
+    --     if not getPieceAt[piece.X] then
+    --         getPieceAt[piece.X] = {}
+    --     end
+    --     getPieceAt[piece.X][piece.Y] = piece;
+    -- end
 
     -- potential bug: if it's pawn then there's literally no available squares
     -- if we've clicked outside of the arena?
@@ -298,7 +310,7 @@ local function findavailable(selectedPiece, newBoard)
                 for v = 1, 9 do
                     -- tab is all coordinates of the board
                     -- if there is a spot on the table for this location
-                    local spot = GetPieceAt[h][v]
+                    local spot = getPieceAt[h][v]
                     if spot then
                         if spot.O == selectedPiece.O and spot.Name == "Pawn" and spot.P == 1 then
                             pawn = true
@@ -312,7 +324,7 @@ local function findavailable(selectedPiece, newBoard)
                 for v = 1, 9 do
                     -- make every spot available
 
-                    local spot = GetPieceAt[h][v];
+                    local spot = getPieceAt[h][v];
 
                     -- pieces can only be sent to where they can move one more time (so they can promote)
 
@@ -364,7 +376,7 @@ local function findavailable(selectedPiece, newBoard)
                 local currentY = selectedPiece.Y + selectedPiece.O
                 -- get position of rook in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = GetPieceAt[currentX][currentY]
+                    local spot = getPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
@@ -477,7 +489,7 @@ local function findavailable(selectedPiece, newBoard)
                 local currentY = selectedPiece.Y + dy
                 -- get position of rook in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = GetPieceAt[currentX][currentY]
+                    local spot = getPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
@@ -538,7 +550,7 @@ local function findavailable(selectedPiece, newBoard)
                 local currentY = selectedPiece.Y + dy
                 -- get position of bishop in this direction
                 while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = GetPieceAt[currentX][currentY]
+                    local spot = getPieceAt[currentX][currentY]
 
                     -- if there is a piece in the way, our bishop cannot move further
                     if spot then
@@ -591,7 +603,7 @@ local function findavailable(selectedPiece, newBoard)
             local newX = selectedPiece.X + dx
 
             if not (newY > 9 or newY < 1) and not (newX > 9 or newX < 1) then
-                local spot = GetPieceAt[newX][newY]
+                local spot = getPieceAt[newX][newY]
                 if spot then
                     if spot.O ~= selectedPiece.O then
                         table.insert(available, {
@@ -615,69 +627,95 @@ end
 -- function that takes the name of a piece and a table, returns if it checks
 -- the king?
 -- how are we getting the name in piece ?
-local function check(piece, newtable)
+local function check(selectedPiece, newBoard, getPieceAt)
     -- iterate over the array until we find owner
     -- this is less efficient than a hashmap (what we were using before)...
     -- pieces are immutable anyway so using a registry might be best
     -- for now we'll iterate
 
-    local check = false
+    -- local check = false
 
-    for _, piece in ipairs(Pieces) do
+    for _, piece in ipairs(newBoard) do
         if piece.O == piece.O * -1 then
-            for available in findavailable(piece, newtable) do
-                if available.X == piece.X and available.Y == piece.Y then
-                    check = true
+            for available in findavailable(piece, getPieceAt) do
+                if available.X == selectedPiece.X and available.Y == selectedPiece.Y then
+                    return true
+                    -- check = true
                 end
             end
         end
     end
-    return check
+    -- return check
+    return false
 end
 
 -- Process the available moves, only allow those in which the king is not in
--- check
-local function moves(piece, newtable, registry)
-    local pieces = newtable or Pieces
-    -- again, not sure how we're getting the piece name
-    -- local pieceInQuestion = pieces[pieceName]
+-- we basically test every single available move, by making the move, then
+-- check if the king is still checked after that move. If the king is
+-- still checked, it's not a valid move
+-- if there are no valid moves, it's GG, checkmate
+local function moves(selectedPiece)
+    -- local pieces = newBoard or Pieces
 
-    local newavailable = {}
-    -- local available = findavailable(pieceInQuestion)
+    local newAvailableSquares = {}
 
-    for available in findavailable(piece) do
-        -- clone the current table
-        local filteredAvailable = {}
-        local newPiece = nil
-        for i, v in pairs(pieces) do
-            filteredAvailable[i] = v
-            if v.X == piece.X and v.Y == piece.Y then
-                newPiece = filteredAvailable[i]
+    -- First we want to select the selectedPiece
+    local selectedPieceIdx = PieceRegistry[selectedPiece.Name][selectedPiece.O]
+
+    for _, availableSquare in ipairs(findavailable(selectedPiece, GetPieceAt)) do
+        -- build a cache
+        local getPieceAt = {}
+        for _, piece in ipairs(Pieces) do
+            if not getPieceAt[piece.X] then
+                getPieceAt[piece.X] = {}
             end
+            getPieceAt[piece.X][piece.Y] = piece;
         end
 
-        local spot = GetPieceAt[available.X][available.Y]
+        -- clone the current table
+        local tempBoardWithSelectedPieceMoved = {}
+        for i, piece in ipairs(Pieces) do
+            tempBoardWithSelectedPieceMoved[i] = {
+                Name = piece.Name,
+                X = piece.X,
+                Y = piece.Y,
+                O = piece.O,
+                P = piece.P
+            } 
+        end
+
+        -- print(dump(tempBoardWithSelectedPieceMoved))
+        -- print(selectedPieceIdx)
+
+        -- we also want to delete the piece that we're moving to, if there's actually something there
+
+        local availablePieceBeingOverwritten = getPieceAt[availableSquare.X][availableSquare.Y]
 
         -- captured pieces in shogi go to the opponent, in which they can play anywhere
-        if spot then
-            if spot.O ~= piece.O then
-                spot.X = 0
-                spot.Y = 0
-                spot.P = 1
-                spot.O = piece.O
-            end
+        if availablePieceBeingOverwritten and availablePieceBeingOverwritten.O ~= selectedPiece.O then
+            local tIndex = PieceRegistry[availablePieceBeingOverwritten.Name][availablePieceBeingOverwritten.O]
+
+            local t = tempBoardWithSelectedPieceMoved[tIndex]
+
+            t.X = 0
+            t.Y = 0
+            t.P = 1
+            t.O = selectedPiece.O
         end
 
         -- move the piece in question to its new spot, in the new table
-        newPiece.X = available.X
-        newPiece.Y = available.Y
+        local movedPiece = tempBoardWithSelectedPieceMoved[selectedPieceIdx]
+        movedPiece.X = availableSquare.X
+        movedPiece.Y = availableSquare.Y
 
-        local kingPiece = registry[piece.O]["King"]
-        if not check(kingPiece, filteredAvailable) then
-            table.insert(newavailable, available)
+        local kingPiece = tempBoardWithSelectedPieceMoved[PieceRegistry["King"][selectedPiece.O]]
+
+        if not check(kingPiece, tempBoardWithSelectedPieceMoved, getPieceAt) then
+            table.insert(newAvailableSquares, availableSquare)
         end
     end
-    return newavailable
+
+    return newAvailableSquares
 end
 
 -- move the piece
@@ -1212,9 +1250,12 @@ function love.mousepressed(x, y, button, istouch)
             end
             -- populate the available list!
             ShowAvailable = true
-            Available = findavailable(selectedPiece)
+            Available = moves(selectedPiece)
+            -- Available = findavailable(selectedPiece, GetPieceAt)
         else
-            -- check if 
+            -- Available = findavailable(selectedPiece, GetPieceAt)
+            Available = moves(selectedPiece)
+            -- check if
 
         end
     else
