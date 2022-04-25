@@ -615,7 +615,7 @@ end
 -- function that takes the name of a piece and a table, returns if it checks
 -- the king?
 -- how are we getting the name in piece ?
-local function check(pieceInQuestion, newtable)
+local function check(piece, newtable)
     -- iterate over the array until we find owner
     -- this is less efficient than a hashmap (what we were using before)...
     -- pieces are immutable anyway so using a registry might be best
@@ -623,10 +623,10 @@ local function check(pieceInQuestion, newtable)
 
     local check = false
 
-    for piece in Pieces do
+    for _, piece in ipairs(Pieces) do
         if piece.O == piece.O * -1 then
-            for spot in findavailable(piece, newtable) do
-                if spot.X == piece.X and spot.Y == piece.Y then
+            for available in findavailable(piece, newtable) do
+                if available.X == piece.X and available.Y == piece.Y then
                     check = true
                 end
             end
@@ -635,51 +635,45 @@ local function check(pieceInQuestion, newtable)
     return check
 end
 
--- don't know, might just be for the AI
-local function moves(pieceName, newtable, registry)
+-- Process the available moves, only allow those in which the king is not in
+-- check
+local function moves(piece, newtable, registry)
     local pieces = newtable or Pieces
     -- again, not sure how we're getting the piece name
     -- local pieceInQuestion = pieces[pieceName]
 
-    if pieceInQuestion == nil then return end
-
     local newavailable = {}
     -- local available = findavailable(pieceInQuestion)
 
-    local hashmap = {}
-    for piece in pieces do
-        hashmap[piece.X][piece.Y] = piece;
-    end
-
-    for available in findavailable(pieceInQuestion) do
+    for available in findavailable(piece) do
         -- clone the current table
-        local newtable = {}
-        local newPieceInQuestion = nil
+        local filteredAvailable = {}
+        local newPiece = nil
         for i, v in pairs(pieces) do
-            newtable[i] = v
-            if v.X == pieceInQuestion.X and v.Y == pieceInQuestion.Y then
-                newPieceInQuestion = newtable[i]
+            filteredAvailable[i] = v
+            if v.X == piece.X and v.Y == piece.Y then
+                newPiece = filteredAvailable[i]
             end
         end
 
-        local spot = hashmap[available.X][available.Y]
+        local spot = GetPieceAt[available.X][available.Y]
 
         -- captured pieces in shogi go to the opponent, in which they can play anywhere
         if spot then
-            if spot.O ~= pieceInQuestion.O then
+            if spot.O ~= piece.O then
                 spot.X = 0
                 spot.Y = 0
                 spot.P = 1
-                spot.O = pieceInQuestion.O
+                spot.O = piece.O
             end
         end
 
         -- move the piece in question to its new spot, in the new table
-        newPieceInQuestion.X = available.X
-        newPieceInQuestion.Y = available.Y
+        newPiece.X = available.X
+        newPiece.Y = available.Y
 
-        local kingPiece = registry[pieceInQuestion.O]["King"]
-        if not check(kingPiece, newtable) then
+        local kingPiece = registry[piece.O]["King"]
+        if not check(kingPiece, filteredAvailable) then
             table.insert(newavailable, available)
         end
     end
@@ -687,30 +681,12 @@ local function moves(pieceName, newtable, registry)
 end
 
 -- move the piece
-local function movepiece(plr, pieceName, x, y, promote, registry)
-    if running == true then return end
+local function movepiece(pieceFrom, x, y)
 
-    -- not sure how we're getting the piecename
-    local call = Pieces[pieceName]
-    if call == nil then return end
-    if turn ~= call.O then return end
-    -- what is TRUE
-    -- if cool == true then return end
-    -- cool = true
-
-    local hashmap = {}
-    for piece in Pieces do
-        hashmap[piece.X][piece.Y] = piece;
-    end
 
     -- unpromote the piece if we're moving it to storage
     if call.X == 0 or call.Y == 0 then
         promote = false
-    end
-
-    local hashmap = {}
-    for piece in Pieces do
-        hashmap[piece.X][piece.Y] = piece;
     end
 
     -- get all available moves
@@ -1223,17 +1199,24 @@ function love.mousepressed(x, y, button, istouch)
         local pieceX = math.floor((x - Origin.x) / SquareSideLength) + 1
         local pieceY = 9 - math.floor((y - Origin.y) / SquareSideLength)
 
-
         -- get piece at that location
         local selectedPiece = GetPieceAt[pieceX][pieceY]
-        -- check if piece's owner belongs to the current turn
-        if not selectedPiece or selectedPiece.O ~= Turn then
-            ShowAvailable = false
-            return
+
+        -- if we haven't selected a previous piece yet
+        if not ShowAvailable then
+            -- if piece's owner does not belong to the person that's moving, or a piece doesn't exist
+            if not selectedPiece or selectedPiece.O ~= Turn then
+                -- deselect everything
+                ShowAvailable = false
+                return
+            end
+            -- populate the available list!
+            ShowAvailable = true
+            Available = findavailable(selectedPiece)
+        else
+            -- check if 
+
         end
-        -- populate the available list!
-        ShowAvailable = true
-        Available = findavailable(selectedPiece)
     else
         ShowAvailable = false
     end
