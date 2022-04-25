@@ -1,25 +1,24 @@
-local function rebuildRegistry()
-    PieceRegistry = {}
-    -- TODO needs to be rebuilt every time a capture occurs lol
-    for idx, piece in ipairs(Pieces) do
-        if not PieceRegistry[piece.Name] then
-            PieceRegistry[piece.Name] = {}
-        end
-        PieceRegistry[piece.Name][piece.O] = idx
-    end
-end
+-- local function buildRegistryFrom(board)
+--     local registry = {}
+--     -- TODO needs to be rebuilt every time a capture occurs lol
+--     for _, piece in ipairs(board) do
+--         registry[piece.Id] = piece
+--     end
+--     return registry
+-- end
 
 -- Global register for pieces at any location
 -- hashmap, stores existing references to pieces at their coordinates
 -- Must be updated (via recomputation) every time someone moves
-local function rebuildGetPieceAt() 
-    GetPieceAt = {}
-    for _, piece in ipairs(Pieces) do
-        if not GetPieceAt[piece.X] then
-            GetPieceAt[piece.X] = {}
+local function buildGetPieceAtFrom(board)
+    local getPieceAt = {}
+    for _, piece in ipairs(board) do
+        if not getPieceAt[piece.X] then
+            getPieceAt[piece.X] = {}
         end
-        GetPieceAt[piece.X][piece.Y] = piece;
+        getPieceAt[piece.X][piece.Y] = piece;
     end
+    return getPieceAt
 end
 
 -- copied from https://stackoverflow.com/a/27028488/11742422
@@ -67,6 +66,12 @@ local function getNewBoard()
         X = 5,
         Y = 1,
         O = Player.ONE
+    },
+    {
+        Name = "King",
+        X = 5,
+        Y = 9,
+        O = Player.TWO
     },
     {
         Name = "Gold",
@@ -127,12 +132,6 @@ local function getNewBoard()
         X = 2,
         Y = 2,
         O = Player.ONE
-    },
-    {
-        Name = "King",
-        X = 5,
-        Y = 9,
-        O = Player.TWO
     },
     {
         Name = "Gold",
@@ -217,8 +216,9 @@ local function getNewBoard()
         });
     end
 
-    for _, piece in ipairs(pieces) do
+    for i, piece in ipairs(pieces) do
         piece.P = Rank.NORMAL;
+        piece.Id = i
     end
 
     return pieces
@@ -243,7 +243,7 @@ local function setupPieces()
     -- except we're using a dictionary
     Pieces = getNewBoard()
     -- create a registry for pieces, returns the index of the array
-    rebuildRegistry()
+    -- GlobalPieceRegistry = buildRegistryFrom(Pieces)
 
     -- variable that stores if the game is not over
     -- local running = true
@@ -352,9 +352,9 @@ local function findavailable(selectedPiece, getPieceAt)
 
                     if not spot then
                         if pieceName == "Pawn" or pieceName == "Lance" or pieceName == "Knight" then
-                            if selectedPiece.O * 4 + 5 == v then
+                            if selectedPiece.O * 4 + 5 ~= v then
                                 table.insert(available, { X = h, Y = v })
-                            elseif selectedPiece.O * 3 + 5 == v and pieceName == "Knight" then
+                            elseif selectedPiece.O * 3 + 5 ~= v and pieceName == "Knight" then
                                 table.insert(available, { X = h, Y = v })
                             end
                         else
@@ -376,12 +376,12 @@ local function findavailable(selectedPiece, getPieceAt)
         -- if it's pawn promote to gold
         if pieceName == "Pawn" then
             if selectedPiece.P == Rank.NORMAL then
-                table.insert(dydxList, { selectedPiece.O, 0 })
+                table.insert(dydxList, { 1, 0 })
             else
                 for y = -1, 1 do
                     for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * selectedPiece.O, x })
+                            table.insert(dydxList, { y, x })
                         end
                     end
                 end
@@ -389,11 +389,11 @@ local function findavailable(selectedPiece, getPieceAt)
             -- for lance, dynamically generate a list of dydx at runtime
         elseif pieceName == "Lance" then
             if selectedPiece.P == Rank.NORMAL then
-                local currentX = selectedPiece.X
-                local currentY = selectedPiece.Y + selectedPiece.O
+                local newX = selectedPiece.X
+                local newY = selectedPiece.Y + selectedPiece.O
                 -- get position of rook in this direction
-                while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = getPieceAt[currentX][currentY]
+                while newX >= 1 and newX <= 9 and newY >= 1 and newY <= 9 do
+                    local spot = getPieceAt[newX][newY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
@@ -402,28 +402,27 @@ local function findavailable(selectedPiece, getPieceAt)
                         if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
-                                X = currentX,
-                                Y = currentY
+                                X = newX,
+                                Y = newY
                             })
                         end
                         -- break out
                         break
                     else
                         table.insert(available, {
-                            X = currentX,
-                            Y = currentY
+                            X = newX,
+                            Y = newY
                         })
                     end
 
-                    currentX = currentX
-                    currentY = currentY + selectedPiece.O
+                    newY = newY + selectedPiece.O
                 end
             else
                 -- gold movement
                 for y = -1, 1 do
                     for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * selectedPiece.O, x })
+                            table.insert(dydxList, { y, x })
                         end
                     end
                 end
@@ -432,13 +431,13 @@ local function findavailable(selectedPiece, getPieceAt)
         elseif pieceName == "Knight" then
             if selectedPiece.P == Rank.NORMAL then
                 for _, x in ipairs({ -1, 1 }) do
-                    table.insert(dydxList, { 2 * selectedPiece.O, x })
+                    table.insert(dydxList, { 2, x })
                 end
             else
                 for y = -1, 1 do
                     for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * selectedPiece.O, x })
+                            table.insert(dydxList, { y, x })
                         end
                     end
                 end
@@ -461,13 +460,13 @@ local function findavailable(selectedPiece, getPieceAt)
                         -1, 1
                     }
                 }) do
-                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
+                    table.insert(dydxList, { coordinate[1], coordinate[2] })
                 end
             else
                 for y = -1, 1 do
                     for x = -1, 1 do
                         if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                            table.insert(dydxList, { y * selectedPiece.O, x })
+                            table.insert(dydxList, { y, x })
                         end
                     end
                 end
@@ -477,7 +476,7 @@ local function findavailable(selectedPiece, getPieceAt)
             for y = -1, 1 do
                 for x = -1, 1 do
                     if not (y == -1 and x == -1) and not (y == -1 and x == 1) then
-                        table.insert(dydxList, { y * selectedPiece.O, x })
+                        table.insert(dydxList, { y, x })
                     end
                 end
             end
@@ -485,7 +484,7 @@ local function findavailable(selectedPiece, getPieceAt)
         elseif pieceName == "King" then
             for y = -1, 1 do
                 for x = -1, 1 do
-                    table.insert(dydxList, { y * selectedPiece.O, x })
+                    table.insert(dydxList, { y, x })
                 end
             end
         elseif pieceName == "Rook" then
@@ -502,11 +501,11 @@ local function findavailable(selectedPiece, getPieceAt)
                 local dy = dydx[1]
                 local dx = dydx[2]
 
-                local currentX = selectedPiece.X + dx
-                local currentY = selectedPiece.Y + dy
+                local newX = selectedPiece.X + dx
+                local newY = selectedPiece.Y + dy
                 -- get position of rook in this direction
-                while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = getPieceAt[currentX][currentY]
+                while newX >= 1 and newX <= 9 and newY >= 1 and newY <= 9 do
+                    local spot = getPieceAt[newX][newY]
 
                     -- if there is a piece in the way, our rook cannot move further
                     if spot then
@@ -515,21 +514,21 @@ local function findavailable(selectedPiece, getPieceAt)
                         if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
-                                X = currentX,
-                                Y = currentY
+                                X = newX,
+                                Y = newY
                             })
                         end
                         -- break out
                         break
                     else
                         table.insert(available, {
-                            X = currentX,
-                            Y = currentY
+                            X = newX,
+                            Y = newY
                         })
                     end
 
-                    currentX = currentX + dx
-                    currentY = currentY + dy
+                    newX = newX + dx
+                    newY = newY + dy
                 end
             end
 
@@ -546,7 +545,7 @@ local function findavailable(selectedPiece, getPieceAt)
                         -1, 1
                     }
                 }) do
-                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
+                    table.insert(dydxList, { coordinate[1], coordinate[2] })
                 end
             end
         elseif pieceName == "Bishop" then
@@ -563,11 +562,11 @@ local function findavailable(selectedPiece, getPieceAt)
                 local dy = dydx[1]
                 local dx = dydx[2]
 
-                local currentX = selectedPiece.X + dx
-                local currentY = selectedPiece.Y + dy
+                local newX = selectedPiece.X + dx
+                local newY = selectedPiece.Y + dy
                 -- get position of bishop in this direction
-                while currentX >= 1 and currentX <= 9 and currentY >= 1 and currentY <= 9 do
-                    local spot = getPieceAt[currentX][currentY]
+                while newX >= 1 and newX <= 9 and newY >= 1 and newY <= 9 do
+                    local spot = getPieceAt[newX][newY]
 
                     -- if there is a piece in the way, our bishop cannot move further
                     if spot then
@@ -576,21 +575,21 @@ local function findavailable(selectedPiece, getPieceAt)
                         if spot.O ~= selectedPiece.O then
                             -- otherwise, add it as a valid move directly into the insert
                             table.insert(available, {
-                                X = currentX,
-                                Y = currentY
+                                X = newX,
+                                Y = newY
                             })
                         end
                         -- break out
                         break
                     else
                         table.insert(available, {
-                            X = currentX,
-                            Y = currentY
+                            X = newX,
+                            Y = newY
                         })
                     end
 
-                    currentX = currentX + dx
-                    currentY = currentY + dy
+                    newX = newX + dx
+                    newY = newY + dy
                 end
             end
 
@@ -607,7 +606,7 @@ local function findavailable(selectedPiece, getPieceAt)
                         0, 1
                     }
                 }) do
-                    table.insert(dydxList, { coordinate[1] * selectedPiece.O, coordinate[2] })
+                    table.insert(dydxList, { coordinate[1], coordinate[2] })
                 end
             end
         end
@@ -616,7 +615,7 @@ local function findavailable(selectedPiece, getPieceAt)
             local dy = dydx[1]
             local dx = dydx[2]
 
-            local newY = selectedPiece.Y + dy
+            local newY = selectedPiece.Y + dy * selectedPiece.O
             local newX = selectedPiece.X + dx
 
             if newY >= 1 and newY <= 9 and newX >= 1 and newX <= 9 then
@@ -645,14 +644,9 @@ end
 -- the king?
 -- how are we getting the name in piece ?
 local function check(selectedPiece, newBoard, getPieceAt)
-    -- iterate over the array until we find owner
-    -- this is less efficient than a hashmap (what we were using before)...
-    -- pieces are immutable anyway so using a registry might be best
-    -- for now we'll iterate
-
-    -- local check = false
-
+    -- for every piece in this current board
     for _, piece in ipairs(newBoard) do
+        -- for every piece that does not have the same owner
         if selectedPiece.O == piece.O * -1 then
             for _, available in ipairs(findavailable(piece, getPieceAt)) do
                 if available.X == selectedPiece.X and available.Y == selectedPiece.Y then
@@ -671,13 +665,12 @@ end
 -- check if the king is still checked after that move. If the king is
 -- still checked, it's not a valid move
 -- if there are no valid moves, it's GG, checkmate
-local function moves(selectedPiece)
+local function moves(selectedPiece, turn)
     -- local pieces = newBoard or Pieces
 
     local newAvailableSquares = {}
 
     -- First we want to select the selectedPiece
-    local selectedPieceIdx = PieceRegistry[selectedPiece.Name][selectedPiece.O]
 
     -- for each available square, create a new board with that piece moved
     for _, availableSquare in ipairs(findavailable(selectedPiece, GetPieceAt)) do
@@ -703,9 +696,7 @@ local function moves(selectedPiece)
 
         -- captured pieces in shogi go to the opponent, in which they can play anywhere
         if availablePieceBeingOverwritten and availablePieceBeingOverwritten.O ~= selectedPiece.O then
-            local tIndex = PieceRegistry[availablePieceBeingOverwritten.Name][availablePieceBeingOverwritten.O]
-
-            local t = tempBoardWithSelectedPieceMoved[tIndex]
+            local t = tempBoardWithSelectedPieceMoved[availablePieceBeingOverwritten.Id]
 
             t.X = 0
             t.Y = 0
@@ -714,11 +705,11 @@ local function moves(selectedPiece)
         end
 
         -- move the piece in question to its new spot, in the new table
-        local movedPiece = tempBoardWithSelectedPieceMoved[selectedPieceIdx]
+        local movedPiece = tempBoardWithSelectedPieceMoved[selectedPiece.Id]
         movedPiece.X = availableSquare.X
         movedPiece.Y = availableSquare.Y
 
-        local kingPiece = tempBoardWithSelectedPieceMoved[PieceRegistry["King"][selectedPiece.O]]
+        local kingPiece = tempBoardWithSelectedPieceMoved[(selectedPiece.O * -1) / 2 + 1.5]
 
         -- build a cache for the new table
         local getPieceAt = {}
@@ -728,6 +719,8 @@ local function moves(selectedPiece)
             end
             getPieceAt[piece.X][piece.Y] = piece;
         end
+
+        -- print(dump(kingPiece))
 
         if not check(kingPiece, tempBoardWithSelectedPieceMoved, getPieceAt) then
             table.insert(newAvailableSquares, availableSquare)
@@ -821,14 +814,6 @@ local function movePiece(pieceFrom, x, y)
             pieceFrom.X = x
             pieceFrom.Y = y
 
-            if promote == true and pieceFrom.Name ~= "Gold" and pieceFrom.Name ~= "King" and pieceFrom.Name ~= "Jewel" then
-                if pieceFrom.O == -1 and pieceFrom.Y <= 3 then
-                    pieceFrom.P = 2
-                elseif pieceFrom.O == 1 and pieceFrom.Y >= 7 then
-                    pieceFrom.P = 2
-                end
-            end
-
             -- if oldp == 2 then
             -- 	goal.CFrame = origin * CFrame.new(12.5 - 2.5 * call.X, 1.6, 2.5 * call.Y - 12.5) * CFrame.Angles(0, -math.pi / 2 * call.O, math.pi)
             -- else
@@ -853,10 +838,10 @@ local function movePiece(pieceFrom, x, y)
 
             Turn = Turn * -1
 
-            local kingPiece = Pieces[PieceRegistry["King"][Turn]]
+            local kingPiece = Pieces[(Turn * -1) / 2 + 1.5]
 
-            -- rebuild pieceat
-            rebuildGetPieceAt()
+            -- rebuild piecea
+            GetPieceAt = buildGetPieceAtFrom(Pieces)
 
             local check = check(kingPiece, Pieces, GetPieceAt)
 
@@ -1186,7 +1171,7 @@ function love.load()
     -- Player turn
     Turn = Player.ONE
 
-    rebuildGetPieceAt()
+    GetPieceAt = buildGetPieceAtFrom(Pieces)
 
     -- Determines what we're rendering?
     -- ShowAvailable = false
@@ -1276,7 +1261,7 @@ function love.mousepressed(x, y, button, istouch)
             -- Available = findavailable(selectedPiece, GetPieceAt)
             -- Available = moves(selectedPiece)
 
-            rebuildRegistry()
+            -- rebuildRegistry()
             -- rebuildGetPieceAt()
             -- check if
 
