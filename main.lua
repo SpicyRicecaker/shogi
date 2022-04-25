@@ -1,3 +1,27 @@
+local function rebuildRegistry()
+    PieceRegistry = {}
+    -- TODO needs to be rebuilt every time a capture occurs lol
+    for idx, piece in ipairs(Pieces) do
+        if not PieceRegistry[piece.Name] then
+            PieceRegistry[piece.Name] = {}
+        end
+        PieceRegistry[piece.Name][piece.O] = idx
+    end
+end
+
+-- Global register for pieces at any location
+-- hashmap, stores existing references to pieces at their coordinates
+-- Must be updated (via recomputation) every time someone moves
+local function rebuildGetPieceAt() 
+    GetPieceAt = {}
+    for _, piece in ipairs(Pieces) do
+        if not GetPieceAt[piece.X] then
+            GetPieceAt[piece.X] = {}
+        end
+        GetPieceAt[piece.X][piece.Y] = piece;
+    end
+end
+
 -- copied from https://stackoverflow.com/a/27028488/11742422
 -- how illegal is it that this isn't a function in std
 local function dump(o)
@@ -219,14 +243,7 @@ local function setupPieces()
     -- except we're using a dictionary
     Pieces = getNewBoard()
     -- create a registry for pieces, returns the index of the array
-    PieceRegistry = {}
-    -- TODO needs to be rebuilt every time a capture occurs lol
-    for idx, piece in ipairs(Pieces) do
-        if not PieceRegistry[piece.Name] then
-            PieceRegistry[piece.Name] = {}
-        end
-        PieceRegistry[piece.Name][piece.O] = idx
-    end
+    rebuildRegistry()
 
     -- variable that stores if the game is not over
     -- local running = true
@@ -602,7 +619,7 @@ local function findavailable(selectedPiece, getPieceAt)
             local newY = selectedPiece.Y + dy
             local newX = selectedPiece.X + dx
 
-            if not (newY > 9 or newY < 1) and not (newX > 9 or newX < 1) then
+            if newY >= 1 and newY <= 9 and newX >= 1 and newX <= 9 then
                 local spot = getPieceAt[newX][newY]
                 if spot then
                     if spot.O ~= selectedPiece.O then
@@ -636,8 +653,8 @@ local function check(selectedPiece, newBoard, getPieceAt)
     -- local check = false
 
     for _, piece in ipairs(newBoard) do
-        if piece.O == piece.O * -1 then
-            for available in findavailable(piece, getPieceAt) do
+        if selectedPiece.O == piece.O * -1 then
+            for _, available in ipairs(findavailable(piece, getPieceAt)) do
                 if available.X == selectedPiece.X and available.Y == selectedPiece.Y then
                     return true
                     -- check = true
@@ -662,15 +679,8 @@ local function moves(selectedPiece)
     -- First we want to select the selectedPiece
     local selectedPieceIdx = PieceRegistry[selectedPiece.Name][selectedPiece.O]
 
+    -- for each available square, create a new board with that piece moved
     for _, availableSquare in ipairs(findavailable(selectedPiece, GetPieceAt)) do
-        -- build a cache
-        local getPieceAt = {}
-        for _, piece in ipairs(Pieces) do
-            if not getPieceAt[piece.X] then
-                getPieceAt[piece.X] = {}
-            end
-            getPieceAt[piece.X][piece.Y] = piece;
-        end
 
         -- clone the current table
         local tempBoardWithSelectedPieceMoved = {}
@@ -681,15 +691,15 @@ local function moves(selectedPiece)
                 Y = piece.Y,
                 O = piece.O,
                 P = piece.P
-            } 
+            }
         end
 
         -- print(dump(tempBoardWithSelectedPieceMoved))
         -- print(selectedPieceIdx)
 
         -- we also want to delete the piece that we're moving to, if there's actually something there
-
-        local availablePieceBeingOverwritten = getPieceAt[availableSquare.X][availableSquare.Y]
+        -- this variable isn't mutated
+        local availablePieceBeingOverwritten = GetPieceAt[availableSquare.X][availableSquare.Y]
 
         -- captured pieces in shogi go to the opponent, in which they can play anywhere
         if availablePieceBeingOverwritten and availablePieceBeingOverwritten.O ~= selectedPiece.O then
@@ -710,6 +720,15 @@ local function moves(selectedPiece)
 
         local kingPiece = tempBoardWithSelectedPieceMoved[PieceRegistry["King"][selectedPiece.O]]
 
+        -- build a cache for the new table
+        local getPieceAt = {}
+        for _, piece in ipairs(tempBoardWithSelectedPieceMoved) do
+            if not getPieceAt[piece.X] then
+                getPieceAt[piece.X] = {}
+            end
+            getPieceAt[piece.X][piece.Y] = piece;
+        end
+
         if not check(kingPiece, tempBoardWithSelectedPieceMoved, getPieceAt) then
             table.insert(newAvailableSquares, availableSquare)
         end
@@ -719,27 +738,29 @@ local function moves(selectedPiece)
 end
 
 -- move the piece
-local function movepiece(pieceFrom, x, y)
+local function movePiece(pieceFrom, x, y)
 
-
-    -- unpromote the piece if we're moving it to storage
-    if call.X == 0 or call.Y == 0 then
+    local promote = true
+    -- do not promote the piece if we're moving fromt storage
+    if pieceFrom.X == 0 or pieceFrom.Y == 0 then
         promote = false
     end
 
     -- get all available moves
-    for available in moves(pieceName) do
+    for _, available in ipairs(Available) do
         if available.X == x and available.Y == y then
-            local spot = hashmap[available.X][available.Y]
-            if spot then
-                if spot.O ~= call.O then
-                    local goal = {}
+            local pieceAboutToBeOverwritten = GetPieceAt[available.X][available.Y]
+            if pieceAboutToBeOverwritten then
+                if pieceAboutToBeOverwritten.O ~= pieceFrom.O then
+                    -- local goal = {}
                     -- goal.CFrame = origin * CFrame.new(12.5 - 2.5 * spot.X, 5, 2.5 * spot.Y - 12.5) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
                     -- tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
-                    spot.X = 0
-                    spot.Y = 0
-                    spot.P = 1
-                    spot.O = call.O
+
+                    -- PUT IT IN THE DISCARD PILE
+                    pieceAboutToBeOverwritten.X = 0
+                    pieceAboutToBeOverwritten.Y = 0
+                    pieceAboutToBeOverwritten.P = 1
+                    pieceAboutToBeOverwritten.O = pieceFrom.O
                     -- wait(0.75)
                     -- goal.CFrame = origin * CFrame.new(-16 * spot.O, 5, -7.5 * spot.O) * CFrame.Angles(0, math.pi / 2 * spot.O, math.pi / 36)
                     -- tween:Create(spot.K, TweenInfo.new(0.5), goal):Play()
@@ -771,19 +792,19 @@ local function movepiece(pieceFrom, x, y)
             end
 
             -- the old piece that we're moving
-            local oldp = call.P
-            local oldx = call.X
+            -- local oldp = pieceFrom.P
+            -- local oldx = pieceFrom.X
 
             -- promote depending on the player and row
-            if promote == true and call.Name ~= "Gold" and call.Name ~= "King" and call.Name ~= "Jewel" then
-                if call.O == Player.TWO and call.Y <= 3 then
-                    call.P = Rank.PROMOTED
-                elseif call.O == Player.ONE and call.Y >= 7 then
-                    call.P = Rank.PROMOTED
+            if promote == true and pieceFrom.Name ~= "Gold" and pieceFrom.Name ~= "King" and pieceFrom.Name ~= "Jewel" then
+                if pieceFrom.O == Player.TWO and pieceFrom.Y <= 3 then
+                    pieceFrom.P = Rank.PROMOTED
+                elseif pieceFrom.O == Player.ONE and pieceFrom.Y >= 7 then
+                    pieceFrom.P = Rank.PROMOTED
                 end
             end
 
-            local goal = {}
+            -- local goal = {}
 
             -- special animations for knight
             -- if oldx == 0 then
@@ -796,13 +817,15 @@ local function movepiece(pieceFrom, x, y)
             -- 	-- wait(0.75)
             -- end
 
-            call.X = x
-            call.Y = y
-            if promote == true and call.K.Name ~= "Gold" and call.K.Name ~= "King" and call.K.Name ~= "Jewel" then
-                if call.O == -1 and call.Y <= 3 then
-                    call.P = 2
-                elseif call.O == 1 and call.Y >= 7 then
-                    call.P = 2
+            -- move the piece
+            pieceFrom.X = x
+            pieceFrom.Y = y
+
+            if promote == true and pieceFrom.Name ~= "Gold" and pieceFrom.Name ~= "King" and pieceFrom.Name ~= "Jewel" then
+                if pieceFrom.O == -1 and pieceFrom.Y <= 3 then
+                    pieceFrom.P = 2
+                elseif pieceFrom.O == 1 and pieceFrom.Y >= 7 then
+                    pieceFrom.P = 2
                 end
             end
 
@@ -828,17 +851,17 @@ local function movepiece(pieceFrom, x, y)
             -- 	wait(0.25)
             -- end
 
-            turn = turn * -1
+            Turn = Turn * -1
 
-            local addon = ""
+            local kingPiece = Pieces[PieceRegistry["King"][Turn]]
 
-            local player = turn / 2 + 1.5
+            -- rebuild pieceat
+            rebuildGetPieceAt()
 
-            local kingPiece = registry[player]["King"]
-            local check = check(kingPiece)
+            local check = check(kingPiece, Pieces, GetPieceAt)
 
             if check == true then
-                addon = "Check - "
+                HUD.check = "Check!"
             end
 
             -- update text for player's turn
@@ -846,9 +869,10 @@ local function movepiece(pieceFrom, x, y)
             -- board.Selected.Position = Vector3.new(0, -3.2, -17.5 * turn) + origin.p
 
             local numofmoves = 0
-            for piece in Pieces do
-                if piece.O == turn then
-                    local available = moves(piece.Name)
+
+            for _, piece in ipairs(Pieces) do
+                if piece.O == Turn then
+                    local available = moves(piece)
                     numofmoves = numofmoves + #available
                 end
             end
@@ -856,11 +880,10 @@ local function movepiece(pieceFrom, x, y)
             if numofmoves == 0 then
                 -- create toast for player winning and losing
                 -- board.BillboardGui.TextLabel.Text = "Checkmate - Player " .. player .. " Wins"
-                running = false
+                Running = false
             end
         end
     end
-    cool = false
 end
 
 -- while running do
@@ -1163,21 +1186,15 @@ function love.load()
     -- Player turn
     Turn = Player.ONE
 
-    -- Global register for pieces at any location
-
-    -- hashmap, stores existing references to pieces at their coordinates
-    -- Must be updated (via recomputation) every time someone moves
-    GetPieceAt = {}
-    for _, piece in ipairs(Pieces) do
-        if not GetPieceAt[piece.X] then
-            GetPieceAt[piece.X] = {}
-        end
-        GetPieceAt[piece.X][piece.Y] = piece;
-    end
+    rebuildGetPieceAt()
 
     -- Determines what we're rendering?
-    ShowAvailable = false
+    -- ShowAvailable = false
     Available = {}
+    SelectedPiece = nil
+
+    HUD = {}
+    Running = true
 end
 
 function love.update()
@@ -1212,7 +1229,7 @@ function love.draw()
     end
 
     -- draw the available moves
-    if ShowAvailable then
+    if SelectedPiece then
         for _, square in ipairs(Available) do
             -- just draw green squares i guess
             love.graphics.rectangle("fill", Origin.x + (square.X - 1) * SquareSideLength, Origin.y + (9 - square.Y) * SquareSideLength, SquareSideLength, SquareSideLength)
@@ -1237,29 +1254,33 @@ function love.mousepressed(x, y, button, istouch)
         local pieceX = math.floor((x - Origin.x) / SquareSideLength) + 1
         local pieceY = 9 - math.floor((y - Origin.y) / SquareSideLength)
 
-        -- get piece at that location
-        local selectedPiece = GetPieceAt[pieceX][pieceY]
 
         -- if we haven't selected a previous piece yet
-        if not ShowAvailable then
+        if not SelectedPiece then
+            -- get piece at that location
+            SelectedPiece = GetPieceAt[pieceX][pieceY]
+
             -- if piece's owner does not belong to the person that's moving, or a piece doesn't exist
-            if not selectedPiece or selectedPiece.O ~= Turn then
+            if not SelectedPiece or SelectedPiece.O ~= Turn then
                 -- deselect everything
-                ShowAvailable = false
+                SelectedPiece = nil
                 return
             end
             -- populate the available list!
-            ShowAvailable = true
-            Available = moves(selectedPiece)
-            -- Available = findavailable(selectedPiece, GetPieceAt)
+            Available = moves(SelectedPiece)
         else
+            -- if in available
+            movePiece(SelectedPiece, pieceX, pieceY)
+            SelectedPiece = false
+
             -- Available = findavailable(selectedPiece, GetPieceAt)
-            Available = moves(selectedPiece)
+            -- Available = moves(selectedPiece)
+
+            rebuildRegistry()
+            -- rebuildGetPieceAt()
             -- check if
 
         end
-    else
-        ShowAvailable = false
     end
     -- TODO need to take into account the captured pieces later
 end
