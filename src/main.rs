@@ -293,23 +293,29 @@ fn mouse_system(
     // selected_piece: Res<SelectedPiece>,
     mut ev_click: EventWriter<ClickEvent>,
     buttons: Res<Input<MouseButton>>,
+    // we need the camera vector to normalize things
+    camera: Query<&Transform, With<Camera>>,
     windows: Res<Windows>,
 ) {
-    println!("123");
     // there can be a selected piece, but there's no such thing as a selected square
     let window = windows.get_primary().unwrap();
 
     if let Some(position) = window.cursor_position() {
+        let position = window_to_world(position, window, camera.single());
         if buttons.just_pressed(MouseButton::Left) {
+            println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
             for (transform, square_position) in square_query.iter() {
+                dbg!(transform, square_position);
+                break;
                 if position.x >= transform.translation.x
                     && position.x <= transform.scale.x + transform.translation.x
                     && position.y >= transform.translation.y
                     && position.y <= transform.scale.y
                 {
+                    println!("square clicked!");
                     ev_click.send(ClickEvent(*square_position));
                     break;
                 }
@@ -325,7 +331,7 @@ fn square_system(
     mut ev_click: EventReader<ClickEvent>,
     mut square_query: Query<(&mut Sprite, &Position), With<Piece>>,
     mut selected_piece: ResMut<SelectedPiece>,
-    colors: Res<Colors>
+    colors: Res<Colors>,
 ) {
     for e in ev_click.iter() {
         for (mut sprite, position) in square_query.iter_mut() {
@@ -335,4 +341,24 @@ fn square_system(
             }
         }
     }
+}
+
+// solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
+fn window_to_world(screen_position: Vec2, window: &Window, camera: &Transform) -> Vec3 {
+    // get the size of the window
+    let window_size = Vec2::new(window.width() as f32, window.height() as f32);
+
+    // convert screen position [0..resolution] to ndc [-1..1] (gpu coordinates)
+    let ndc = (screen_position / window_size) * 2.0 - Vec2::ONE;
+
+    // matrix for undoing the projection and camera transform
+    let ndc_to_world = camera_transform.compute_matrix() * camera.projection_matrix.inverse();
+
+    // use it to convert ndc to world-space coordinates
+    let world_pos = ndc_to_world.project_point3(ndc.extend(-1.0));
+
+    // reduce it to a 2D value
+    let world_pos: Vec2 = world_pos.truncate();
+
+    world_pos
 }
