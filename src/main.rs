@@ -35,9 +35,12 @@ impl Default for Colors {
 
 struct Turn(Player);
 
-struct SelectedPiece {
-    position: Option<Position>,
-}
+#[derive(Component)]
+struct SelectedPiece;
+
+#[derive(Component)]
+struct NegativeSelectedPiece;
+
 
 #[derive(Component)]
 struct Piece;
@@ -50,7 +53,7 @@ fn main() {
         .add_startup_system(camera)
         .insert_resource(ClearColor(Color::hex("282828").unwrap()))
         .insert_resource(Turn(Player::Residing))
-        .insert_resource(SelectedPiece { position: None })
+        // .insert_resource(SelectedPiece { position: None })
         .add_event::<ClickEvent>()
         // default engine stuff end
         .add_startup_system(spawn_squares)
@@ -58,6 +61,7 @@ fn main() {
         .add_startup_system(spawn_debug)
         .add_system(mouse_system)
         .add_system(square_system)
+        .add_system(detect_removals)
         .add_system(debug_system)
         .run();
 }
@@ -306,12 +310,12 @@ fn mouse_system(
         let (camera, camera_transform) = camera.single();
         let position = window_to_world(position, window, camera, camera_transform);
         if buttons.just_pressed(MouseButton::Left) {
-            println!("mouse just got clicked at {:#?}", position);
+            // println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
             for (transform, square_position) in square_query.iter() {
-                let size = transform.scale.x/2.;
+                let size = transform.scale.x / 2.;
 
                 let square_x = transform.translation.x;
                 let square_y = transform.translation.y;
@@ -320,12 +324,12 @@ fn mouse_system(
                 let y = position.y;
 
                 // dbg!(transform, square_position);
-                if x >= square_x-size
-                    && x <= square_x+size
-                    && y >= square_y-size
-                    && y <= square_y+size
+                if x >= square_x - size
+                    && x <= square_x + size
+                    && y >= square_y - size
+                    && y <= square_y + size
                 {
-                    println!("square clicked!");
+                    // println!("square clicked!");
                     ev_click.send(ClickEvent(*square_position));
                     break;
                 }
@@ -338,16 +342,28 @@ fn mouse_system(
 }
 
 fn square_system(
+    mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
-    mut square_query: Query<(&mut Sprite, &Position), With<Piece>>,
-    mut selected_piece: ResMut<SelectedPiece>,
+    mut square_query: Query<(Entity, &mut Sprite, &Position), With<Piece>>,
+    selected_piece: Query<Entity, With<SelectedPiece>>,
     colors: Res<Colors>,
 ) {
     for e in ev_click.iter() {
-        for (mut sprite, position) in square_query.iter_mut() {
+        for (entity, mut sprite, position) in square_query.iter_mut() {
             if position.x == e.0.x && position.y == e.0.y {
-                selected_piece.position = Some(*position);
+                // remove other query
+                for selected_piece in selected_piece.iter() {
+                    let mut entity = commands.entity(selected_piece);
+                    
+                    entity.remove::<SelectedPiece>();
+                    entity.insert(NegativeSelectedPiece);
+                }
+
+                // set the entity's colors and whatnot
+                
+                commands.entity(entity).insert(SelectedPiece);
                 sprite.color = colors.blue;
+                break;
             }
         }
     }
@@ -407,4 +423,11 @@ fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
     //     });
     //     // .insert(Position { x: i, y: j })
     //     // .insert(Square);
+}
+
+fn detect_removals(mut commands: Commands, mut removals: Query<(Entity, &mut Sprite), With<NegativeSelectedPiece>>, colors: Res<Colors>) {
+    for (entity, mut sprite) in removals.iter_mut() {
+        commands.entity(entity).remove::<NegativeSelectedPiece>();
+        sprite.color = colors.dark;
+    }
 }
