@@ -55,8 +55,10 @@ fn main() {
         // default engine stuff end
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
+        .add_startup_system(spawn_debug)
         .add_system(mouse_system)
         .add_system(square_system)
+        .add_system(debug_system)
         .run();
 }
 
@@ -294,26 +296,34 @@ fn mouse_system(
     mut ev_click: EventWriter<ClickEvent>,
     buttons: Res<Input<MouseButton>>,
     // we need the camera vector to normalize things
-    camera: Query<&Transform, With<Camera>>,
+    camera: Query<(&Camera, &GlobalTransform)>,
     windows: Res<Windows>,
 ) {
     // there can be a selected piece, but there's no such thing as a selected square
     let window = windows.get_primary().unwrap();
 
     if let Some(position) = window.cursor_position() {
-        let position = window_to_world(position, window, camera.single());
+        let (camera, camera_transform) = camera.single();
+        let position = window_to_world(position, window, camera, camera_transform);
         if buttons.just_pressed(MouseButton::Left) {
             println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
             for (transform, square_position) in square_query.iter() {
-                dbg!(transform, square_position);
-                break;
-                if position.x >= transform.translation.x
-                    && position.x <= transform.scale.x + transform.translation.x
-                    && position.y >= transform.translation.y
-                    && position.y <= transform.scale.y
+                let size = transform.scale.x/2.;
+
+                let square_x = transform.translation.x;
+                let square_y = transform.translation.y;
+
+                let x = position.x;
+                let y = position.y;
+
+                // dbg!(transform, square_position);
+                if x >= square_x-size
+                    && x <= square_x+size
+                    && y >= square_y-size
+                    && y <= square_y+size
                 {
                     println!("square clicked!");
                     ev_click.send(ClickEvent(*square_position));
@@ -344,7 +354,12 @@ fn square_system(
 }
 
 // solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
-fn window_to_world(screen_position: Vec2, window: &Window, camera: &Transform) -> Vec3 {
+fn window_to_world(
+    screen_position: Vec2,
+    window: &Window,
+    camera: &Camera,
+    camera_transform: &GlobalTransform,
+) -> Vec2 {
     // get the size of the window
     let window_size = Vec2::new(window.width() as f32, window.height() as f32);
 
@@ -361,4 +376,35 @@ fn window_to_world(screen_position: Vec2, window: &Window, camera: &Transform) -
     let world_pos: Vec2 = world_pos.truncate();
 
     world_pos
+}
+
+fn debug_system(windows: Res<Windows>) {
+    // let window = windows.get_primary().unwrap();
+
+    // dbg!(window.height(), window.width());
+}
+
+fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
+    // commands
+    //     .spawn_bundle(SpriteBundle {
+    //         sprite: Sprite {
+    //             color: colors.green,
+    //             // custom_size: Some(Vec2::new(
+    //             //     square_length - square_border,
+    //             // )),
+    //             ..Default::default()
+    //         },
+    //         transform: Transform {
+    //             translation: Vec3::new(
+    //                 -225.,
+    //                 300.,
+    //                 0.0,
+    //             ),
+    //             scale: SQUARE_SIZE,
+    //             ..Default::default()
+    //         },
+    //         ..Default::default()
+    //     });
+    //     // .insert(Position { x: i, y: j })
+    //     // .insert(Square);
 }
