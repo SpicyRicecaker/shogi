@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{math::const_vec3, prelude::*, text::Text2dBounds};
 
 const SQUARE_LENGTH: f32 = 50.0;
@@ -41,7 +43,6 @@ struct SelectedPiece;
 #[derive(Component)]
 struct NegativeSelectedPiece;
 
-
 #[derive(Component)]
 struct Piece;
 
@@ -55,6 +56,7 @@ fn main() {
         .insert_resource(Turn(Player::Residing))
         // .insert_resource(SelectedPiece { position: None })
         .add_event::<ClickEvent>()
+        .add_event::<SelectedPieceEvent>()
         // default engine stuff end
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
@@ -63,6 +65,7 @@ fn main() {
         .add_system(square_system)
         .add_system(detect_removals)
         .add_system(debug_system)
+        .add_system(available_square_system)
         .run();
 }
 
@@ -90,6 +93,9 @@ struct Square;
 #[derive(Component)]
 struct Selected;
 
+#[derive(Component)]
+struct Available;
+
 impl From<char> for PieceType {
     fn from(c: char) -> Self {
         match c {
@@ -114,8 +120,8 @@ enum Rank {
 
 #[derive(Component, Clone, Copy)]
 enum Player {
-    Challenging,
-    Residing,
+    Challenging = 1,
+    Residing = -1,
 }
 
 fn is_valid_move() {}
@@ -250,12 +256,23 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
                 // box is centered at box_position, so it is necessary to move by half of the box size to
                 // keep the text in the box.
                 transform: Transform {
-                    translation: Vec3::new(
-                        (x as f32 - 4.5) * SQUARE_LENGTH,
-                        (y as f32 - 4.5) * SQUARE_LENGTH + 2.,
-                        2.0,
-                    ),
-                    ..default()
+                    translation: match player {
+                        Player::Challenging => Vec3::new(
+                            (x as f32 - 4.5) * SQUARE_LENGTH,
+                            (y as f32 - 4.5) * SQUARE_LENGTH + 2.,
+                            2.0,
+                        ),
+                        Player::Residing => Vec3::new(
+                            (x as f32 - 4.5) * SQUARE_LENGTH,
+                            (y as f32 - 4.5) * SQUARE_LENGTH - 2.,
+                            2.0,
+                        ),
+                    },
+                    rotation: match player {
+                        Player::Challenging => Quat::from_rotation_z(0.),
+                        Player::Residing => Quat::from_rotation_z(PI),
+                    },
+                    ..default() // scale: todo!(),
                 },
                 ..default()
             });
@@ -292,7 +309,11 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
 // it's hard to do a selected piece without a global resource, because sometimes we might not have a selected piece.
 // regardless, I think that we should try out functional programming in full.
 
-struct ClickEvent(Position);
+struct ClickEvent {
+    position: Position,
+}
+
+struct SelectedPieceEvent;
 
 fn mouse_system(
     square_query: Query<(&Transform, &Position), With<Square>>,
@@ -330,7 +351,9 @@ fn mouse_system(
                     && y <= square_y + size
                 {
                     // println!("square clicked!");
-                    ev_click.send(ClickEvent(*square_position));
+                    ev_click.send(ClickEvent {
+                        position: *square_position,
+                    });
                     break;
                 }
                 // println!("{:#?}", transform.translation);
@@ -347,23 +370,60 @@ fn square_system(
     mut square_query: Query<(Entity, &mut Sprite, &Position), With<Piece>>,
     selected_piece: Query<Entity, With<SelectedPiece>>,
     colors: Res<Colors>,
+    mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
 ) {
     for e in ev_click.iter() {
         for (entity, mut sprite, position) in square_query.iter_mut() {
-            if position.x == e.0.x && position.y == e.0.y {
+            if position.x == e.position.x && position.y == e.position.y {
                 // remove other query
                 for selected_piece in selected_piece.iter() {
                     let mut entity = commands.entity(selected_piece);
-                    
+
                     entity.remove::<SelectedPiece>();
                     entity.insert(NegativeSelectedPiece);
                 }
 
                 // set the entity's colors and whatnot
-                
+
                 commands.entity(entity).insert(SelectedPiece);
+                ev_selected_piece.send(SelectedPieceEvent);
                 sprite.color = colors.blue;
                 break;
+            }
+        }
+    }
+}
+
+fn available_square_system(
+    mut commands: Commands,
+    mut ev_selected_piece: EventReader<SelectedPieceEvent>,
+    mut square_query: Query<(Entity, &mut Sprite, &Position), With<Square>>,
+    colors: Res<Colors>,
+    selected_piece_query: Query<(&Position, &PieceType), With<SelectedPiece>>,
+) {
+    for _ in ev_selected_piece.iter() {
+        let (selected_piece_position, selected_piece_type) = selected_piece_query.single();
+
+        for (entity, mut sprite, position) in square_query.iter_mut() {
+            let (dy, dx) = (
+                position.y as i32 - selected_piece_position.y as i32,
+                position.x as i32 - selected_piece_position.x as i32,
+            );
+
+            match selected_piece_type {
+                PieceType::King => todo!(),
+                PieceType::Pawn => {
+                    if dx == 0 && dy.abs() == 1 {
+                        commands.entity(entity).insert(Available);
+                        sprite.color = colors.green;
+                    }
+                }
+                PieceType::Lance => todo!(),
+                PieceType::Knight => todo!(),
+                PieceType::Silver => todo!(),
+                PieceType::Gold => todo!(),
+                PieceType::Bishop => todo!(),
+                PieceType::Rook => todo!(),
             }
         }
     }
@@ -425,7 +485,11 @@ fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
     //     // .insert(Square);
 }
 
-fn detect_removals(mut commands: Commands, mut removals: Query<(Entity, &mut Sprite), With<NegativeSelectedPiece>>, colors: Res<Colors>) {
+fn detect_removals(
+    mut commands: Commands,
+    mut removals: Query<(Entity, &mut Sprite), With<NegativeSelectedPiece>>,
+    colors: Res<Colors>,
+) {
     for (entity, mut sprite) in removals.iter_mut() {
         commands.entity(entity).remove::<NegativeSelectedPiece>();
         sprite.color = colors.dark;
