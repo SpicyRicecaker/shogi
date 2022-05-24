@@ -35,7 +35,9 @@ impl Default for Colors {
     }
 }
 
-struct Turn(Player);
+struct Turn {
+    player: Player,
+}
 
 #[derive(Component)]
 struct SelectedPiece;
@@ -53,7 +55,9 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(camera)
         .insert_resource(ClearColor(Color::hex("282828").unwrap()))
-        .insert_resource(Turn(Player::Residing))
+        .insert_resource(Turn {
+            player: Player::Challenging,
+        })
         // .insert_resource(SelectedPiece { position: None })
         .add_event::<ClickEvent>()
         .add_event::<SelectedPieceEvent>()
@@ -65,11 +69,12 @@ fn main() {
         .add_system(square_system)
         .add_system(detect_removals)
         .add_system(debug_system)
-        .add_system(available_square_system)
+        .add_system(reset_square_system)
+        .add_system_to_stage(CoreStage::PostUpdate, available_square_system)
         .run();
 }
 
-#[derive(Debug, Component, Clone, Copy)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 struct Position {
     x: usize,
     y: usize,
@@ -118,7 +123,7 @@ enum Rank {
     Promoted,
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Player {
     Challenging = 1,
     Residing = -1,
@@ -313,7 +318,11 @@ struct ClickEvent {
     position: Position,
 }
 
-struct SelectedPieceEvent;
+#[derive(Debug, PartialEq, Eq)]
+enum SelectedPieceEvent {
+    Change,
+    None,
+}
 
 fn mouse_system(
     square_query: Query<(&Transform, &Position), With<Square>>,
@@ -354,12 +363,15 @@ fn mouse_system(
                     ev_click.send(ClickEvent {
                         position: *square_position,
                     });
+                    // DEBUG
+                    println!("DBG: Square clicked at {:#?}", *square_position);
                     break;
                 }
                 // println!("{:#?}", transform.translation);
             }
 
-            // println!("{:#?}", position);
+            // DEBUG
+            // println!("DBG: Square clicked at {:#?}", position);
         }
     }
 }
@@ -367,29 +379,65 @@ fn mouse_system(
 fn square_system(
     mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
-    mut square_query: Query<(Entity, &mut Sprite, &Position), With<Piece>>,
-    selected_piece: Query<Entity, With<SelectedPiece>>,
+    mut piece_query: Query<(Entity, &mut Sprite, &Position, &Player), With<Piece>>,
+    selected_piece: Query<(Entity, &Position), With<SelectedPiece>>,
     colors: Res<Colors>,
     mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
+    turn: Res<Turn>,
 ) {
     for e in ev_click.iter() {
-        for (entity, mut sprite, position) in square_query.iter_mut() {
+        for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
             if position.x == e.position.x && position.y == e.position.y {
+                // Prevent other player from clicking.
+                // Turn off for debugging
+                // if *owner != turn.player {
+                //     break;
+                // }
+
                 // remove other query
-                for selected_piece in selected_piece.iter() {
-                    let mut entity = commands.entity(selected_piece);
 
-                    entity.remove::<SelectedPiece>();
-                    entity.insert(NegativeSelectedPiece);
-                }
+                // set the entity's colors and whatnot,
+                // but only if it isn't the same thing
+                if let Ok((old_selected_piece, old_selected_piece_position)) =
+                    selected_piece.get_single()
+                {
+                    let mut entity_command = commands.entity(old_selected_piece);
+                    entity_command.remove::<SelectedPiece>();
+                    entity_command.insert(NegativeSelectedPiece);
 
-                // set the entity's colors and whatnot
+                    if *position != *old_selected_piece_position {
+                        commands.entity(entity).insert(SelectedPiece);
+                        ev_selected_piece.send(SelectedPieceEvent::Change);
+                        sprite.color = colors.blue;
+                        dbg!("cool");
+                    } else {
+                        dbg!("nothing");
+                        ev_selected_piece.send(SelectedPieceEvent::None);
+                    }
+                } else {
+                    commands.entity(entity).insert(SelectedPiece);
+                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                    sprite.color = colors.blue;
+                        dbg!("cool2");
+                };
 
-                commands.entity(entity).insert(SelectedPiece);
-                ev_selected_piece.send(SelectedPieceEvent);
-                sprite.color = colors.blue;
                 break;
             }
+        }
+    }
+}
+
+fn reset_square_system(
+    mut commands: Commands,
+    mut ev_selected_piece: EventReader<SelectedPieceEvent>,
+    mut square_query: Query<(Entity, &mut Sprite), With<Available>>,
+    colors: Res<Colors>,
+) {
+    for _ in ev_selected_piece.iter() {
+        dbg!("ran reset square system");
+        for (entity, mut sprite) in square_query.iter_mut() {
+            sprite.color = colors.light;
+            commands.entity(entity).remove::<Available>();
         }
     }
 }
@@ -399,31 +447,55 @@ fn available_square_system(
     mut ev_selected_piece: EventReader<SelectedPieceEvent>,
     mut square_query: Query<(Entity, &mut Sprite, &Position), With<Square>>,
     colors: Res<Colors>,
-    selected_piece_query: Query<(&Position, &PieceType), With<SelectedPiece>>,
+    selected_piece_query: Query<(&Position, &PieceType, &Player), With<SelectedPiece>>,
+    // turn: Res<Turn>,
 ) {
-    for _ in ev_selected_piece.iter() {
-        let (selected_piece_position, selected_piece_type) = selected_piece_query.single();
+    for e in ev_selected_piece.iter() {
+        // if there is no selected piece don't populate anything
+        if *e == SelectedPieceEvent::None {
+            dbg!("123123123");
+            break;
+        }
+        dbg!("ran available square system");
+        // DEBUG
+        if let Ok((selected_piece_position, selected_piece_type, owner)) =
+            selected_piece_query.get_single()
+        {
+            dbg!("owner of piece is", *owner);
 
-        for (entity, mut sprite, position) in square_query.iter_mut() {
-            let (dy, dx) = (
-                position.y as i32 - selected_piece_position.y as i32,
-                position.x as i32 - selected_piece_position.x as i32,
-            );
+            for (entity, mut sprite, position) in square_query.iter_mut() {
+                let (dy, dx) = (
+                    position.y as i32 - selected_piece_position.y as i32,
+                    position.x as i32 - selected_piece_position.x as i32,
+                );
 
-            match selected_piece_type {
-                PieceType::King => todo!(),
-                PieceType::Pawn => {
-                    if dx == 0 && dy.abs() == 1 {
-                        commands.entity(entity).insert(Available);
-                        sprite.color = colors.green;
+                let matches = match selected_piece_type {
+                    PieceType::King => (-1..=1).contains(&dx) && (-1..=1).contains(&dy),
+                    PieceType::Pawn => dx == 0 && dy == *owner as i32,
+                    PieceType::Lance => match owner {
+                        Player::Challenging => dx == 0 && dy >= 1,
+                        Player::Residing => dx == 0 && dy <= -1,
+                    },
+                    PieceType::Knight => (dx == 1 || dx == -1) && dy == *owner as i32 * 2,
+                    PieceType::Silver => {
+                        let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, -1], [1, -1]];
+
+                        dxdy.iter()
+                            .any(|&[ddx, ddy]| ddx == dx && ddy * *owner as i32 == dy)
                     }
+                    PieceType::Gold => {
+                        let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0]];
+
+                        dxdy.iter()
+                            .any(|&[ddx, ddy]| ddx == dx && ddy * *owner as i32 == dy)
+                    }
+                    PieceType::Bishop => dx == dy,
+                    PieceType::Rook => dx == 0 || dy == 0,
+                };
+                if matches && !(dy == 0 && dx == 0) {
+                    commands.entity(entity).insert(Available);
+                    sprite.color = colors.green;
                 }
-                PieceType::Lance => todo!(),
-                PieceType::Knight => todo!(),
-                PieceType::Silver => todo!(),
-                PieceType::Gold => todo!(),
-                PieceType::Bishop => todo!(),
-                PieceType::Rook => todo!(),
             }
         }
     }
@@ -491,6 +563,7 @@ fn detect_removals(
     colors: Res<Colors>,
 ) {
     for (entity, mut sprite) in removals.iter_mut() {
+        dbg!("ran removal system");
         commands.entity(entity).remove::<NegativeSelectedPiece>();
         sprite.color = colors.dark;
     }
