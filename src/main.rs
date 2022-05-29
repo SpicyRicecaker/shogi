@@ -69,8 +69,8 @@ fn main() {
         .add_system(square_system)
         .add_system(detect_removals)
         .add_system(debug_system)
-        .add_system(reset_square_system)
-        .add_system_to_stage(CoreStage::PostUpdate, available_square_system)
+        .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
+        .add_system_to_stage(CoreStage::Last, available_square_system)
         .run();
 }
 
@@ -418,7 +418,7 @@ fn square_system(
                     commands.entity(entity).insert(SelectedPiece);
                     ev_selected_piece.send(SelectedPieceEvent::Change);
                     sprite.color = colors.blue;
-                        dbg!("cool2");
+                    dbg!("cool2");
                 };
 
                 break;
