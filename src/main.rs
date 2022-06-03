@@ -35,6 +35,7 @@ impl Default for Colors {
     }
 }
 
+#[derive(Debug)]
 struct Turn {
     player: Player,
 }
@@ -67,6 +68,8 @@ fn main() {
         .add_startup_system(spawn_debug)
         .add_system(mouse_system)
         .add_system(square_system)
+        .add_system(available_square_system)
+        .add_system(move_system)
         .add_system(detect_removals)
         .add_system(debug_system)
         .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
@@ -129,9 +132,14 @@ enum Player {
     Residing = -1,
 }
 
-fn is_valid_move() {}
-
-fn is_piece_between() {}
+impl Player {
+    fn swap(&self) -> Self {
+        match self {
+            Player::Challenging => Player::Residing,
+            Player::Residing => Player::Challenging,
+        }
+    }
+}
 
 fn camera(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -233,6 +241,17 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
     .b.....r.
     lnsgkgsnl
     "##;
+    // let pieces = r##"
+    // .........
+    // .r.......
+    // .........
+    // .........
+    // .........
+    // .........
+    // .........
+    // .........
+    // .........
+    // "##;
 
     for (y, line) in pieces.trim().lines().rev().enumerate() {
         for (x, char) in line.trim().chars().enumerate() {
@@ -246,41 +265,6 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
             };
 
             let piece_type = PieceType::from(char);
-
-            commands.spawn_bundle(Text2dBundle {
-                text: Text::with_section(
-                    get_kanji(piece_type, Rank::Regular, player),
-                    text_style.clone(),
-                    text_alignment_center,
-                ),
-                text_2d_bounds: Text2dBounds {
-                    // Wrap text in the rectangle
-                    size: box_size,
-                },
-                // We align text to the top-left, so this transform is the top-left corner of our text. The
-                // box is centered at box_position, so it is necessary to move by half of the box size to
-                // keep the text in the box.
-                transform: Transform {
-                    translation: match player {
-                        Player::Challenging => Vec3::new(
-                            (x as f32 - 4.5) * SQUARE_LENGTH,
-                            (y as f32 - 4.5) * SQUARE_LENGTH + 2.,
-                            2.0,
-                        ),
-                        Player::Residing => Vec3::new(
-                            (x as f32 - 4.5) * SQUARE_LENGTH,
-                            (y as f32 - 4.5) * SQUARE_LENGTH - 2.,
-                            2.0,
-                        ),
-                    },
-                    rotation: match player {
-                        Player::Challenging => Quat::from_rotation_z(0.),
-                        Player::Residing => Quat::from_rotation_z(PI),
-                    },
-                    ..default() // scale: todo!(),
-                },
-                ..default()
-            });
 
             commands
                 .spawn_bundle(SpriteBundle {
@@ -306,7 +290,43 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
                 .insert(player)
                 .insert(Rank::Regular)
                 .insert(Position { x, y })
-                .insert(Piece);
+                .insert(Piece)
+                .with_children(|parent| {
+                    parent.spawn_bundle(Text2dBundle {
+                        text: Text::with_section(
+                            get_kanji(piece_type, Rank::Regular, player),
+                            text_style.clone(),
+                            text_alignment_center,
+                        ),
+                        text_2d_bounds: Text2dBounds {
+                            // Wrap text in the rectangle
+                            size: box_size,
+                        },
+                        // We align text to the top-left, so this transform is the top-left corner of our text. The
+                        // box is centered at box_position, so it is necessary to move by half of the box size to
+                        // keep the text in the box.
+                        transform: Transform {
+                            translation: match player {
+                                Player::Challenging => Vec3::new(
+                                    0.0,
+                                    2.0,
+                                    2.0,
+                                ),
+                                Player::Residing => Vec3::new(
+                                    0.0,
+                                    -2.0,
+                                    2.0,
+                                ),
+                            },
+                            rotation: match player {
+                                Player::Challenging => Quat::from_rotation_z(0.),
+                                Player::Residing => Quat::from_rotation_z(PI),
+                            },
+                            ..default() // scale: todo!(),
+                        },
+                        ..default()
+                    });
+                });
         }
     }
 }
@@ -364,7 +384,7 @@ fn mouse_system(
                         position: *square_position,
                     });
                     // DEBUG
-                    println!("DBG: Square clicked at {:#?}", *square_position);
+                    // println!("DBG: Square clicked at {:#?}", *square_position);
                     break;
                 }
                 // println!("{:#?}", transform.translation);
@@ -372,6 +392,49 @@ fn mouse_system(
 
             // DEBUG
             // println!("DBG: Square clicked at {:#?}", position);
+        }
+    }
+}
+
+fn translate_transform(x: f32, y: f32, owner: &Player) -> Vec3 {
+    match owner {
+        Player::Challenging => Vec3::new(
+            (x as f32 - 4.5) * SQUARE_LENGTH,
+            (y as f32 - 4.5) * SQUARE_LENGTH + 2.,
+            2.0,
+        ),
+        Player::Residing => Vec3::new(
+            (x as f32 - 4.5) * SQUARE_LENGTH,
+            (y as f32 - 4.5) * SQUARE_LENGTH - 2.,
+            2.0,
+        ),
+    }
+}
+
+fn move_system(
+    mut ev_click: EventReader<ClickEvent>,
+    mut square_query: Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
+    mut selected_piece: Query<(&mut Position, &mut Transform, &Player), With<SelectedPiece>>,
+    mut turn: ResMut<Turn>,
+) {
+    for e in ev_click.iter() {
+        for (entity, position) in square_query.iter_mut() {
+            if position.x == e.position.x && position.y == e.position.y {
+                if let Ok((mut selected_piece_position, mut transform, player)) =
+                    selected_piece.get_single_mut()
+                {
+                    selected_piece_position.x = e.position.x;
+                    selected_piece_position.y = e.position.y;
+
+                    transform.translation = translate_transform(
+                        selected_piece_position.x as f32,
+                        selected_piece_position.y as f32,
+                        player,
+                    );
+
+                    turn.player = turn.player.swap();
+                }
+            }
         }
     }
 }
@@ -390,9 +453,10 @@ fn square_system(
             if position.x == e.position.x && position.y == e.position.y {
                 // Prevent other player from clicking.
                 // Turn off for debugging
-                // if *owner != turn.player {
-                //     break;
-                // }
+                // dbg!("turn player", &turn);
+                if *owner != turn.player {
+                    break;
+                }
 
                 // remove other query
 
@@ -409,21 +473,22 @@ fn square_system(
                         commands.entity(entity).insert(SelectedPiece);
                         ev_selected_piece.send(SelectedPieceEvent::Change);
                         sprite.color = colors.blue;
-                        dbg!("cool");
+                        // dbg!("cool");
                     } else {
-                        dbg!("nothing");
+                        // dbg!("nothing");
                         ev_selected_piece.send(SelectedPieceEvent::None);
                     }
                 } else {
                     commands.entity(entity).insert(SelectedPiece);
                     ev_selected_piece.send(SelectedPieceEvent::Change);
                     sprite.color = colors.blue;
-                    dbg!("cool2");
+                    // dbg!("cool2");
                 };
 
                 break;
             }
         }
+        // run system to check if an available square has been clicked
     }
 }
 
@@ -434,7 +499,7 @@ fn reset_square_system(
     colors: Res<Colors>,
 ) {
     for _ in ev_selected_piece.iter() {
-        dbg!("ran reset square system");
+        // dbg!("ran reset square system");
         for (entity, mut sprite) in square_query.iter_mut() {
             sprite.color = colors.light;
             commands.entity(entity).remove::<Available>();
@@ -442,10 +507,44 @@ fn reset_square_system(
     }
 }
 
+fn is_path_clear(start: &Position, end: &Position, pieces: &[&Position]) -> bool {
+    let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
+        let dy = endy as f32 - starty as f32;
+        let dx = endx as f32 - startx as f32;
+
+        ((dy).atan2(dx), (dy.powi(2) + dx.powi(2)).sqrt())
+    };
+
+    let (trajectory_angle, trajectory_magnitude) =
+        polar_maker(start.x as f32, start.y as f32, end.x as f32, end.y as f32);
+
+    // dbg!("runinng");
+
+    !pieces
+        .iter()
+        // do not include the piece itself in consideration
+        .filter(|p| !(p.x == start.x && p.y == start.y))
+        .any(|piece| {
+            let (this_trajectory_angle, this_trajectory_magnitude) = polar_maker(
+                start.x as f32,
+                start.y as f32,
+                piece.x as f32,
+                piece.y as f32,
+            );
+
+            // dbg!(this_trajectory_angle, trajectory_angle);
+            // dbg!(this_trajectory_magnitude, trajectory_magnitude);
+
+            this_trajectory_angle == trajectory_angle
+                && this_trajectory_magnitude < trajectory_magnitude
+        })
+}
+
 fn available_square_system(
     mut commands: Commands,
     mut ev_selected_piece: EventReader<SelectedPieceEvent>,
     mut square_query: Query<(Entity, &mut Sprite, &Position), With<Square>>,
+    piece_query: Query<&Position, With<Piece>>,
     colors: Res<Colors>,
     selected_piece_query: Query<(&Position, &PieceType, &Player), With<SelectedPiece>>,
     // turn: Res<Turn>,
@@ -453,20 +552,24 @@ fn available_square_system(
     for e in ev_selected_piece.iter() {
         // if there is no selected piece don't populate anything
         if *e == SelectedPieceEvent::None {
-            dbg!("123123123");
+            // dbg!("123123123");
             break;
         }
-        dbg!("ran available square system");
+        // dbg!("ran available square system");
+
         // DEBUG
         if let Ok((selected_piece_position, selected_piece_type, owner)) =
             selected_piece_query.get_single()
         {
-            dbg!("owner of piece is", *owner);
+            // dbg!("owner of piece is", *owner);
 
-            for (entity, mut sprite, position) in square_query.iter_mut() {
+            // create vector of all pieces
+            let pieces: Vec<&Position> = piece_query.iter().collect();
+
+            for (entity, mut sprite, to_position) in square_query.iter_mut() {
                 let (dy, dx) = (
-                    position.y as i32 - selected_piece_position.y as i32,
-                    position.x as i32 - selected_piece_position.x as i32,
+                    to_position.y as i32 - selected_piece_position.y as i32,
+                    to_position.x as i32 - selected_piece_position.x as i32,
                 );
 
                 let matches = match selected_piece_type {
@@ -492,7 +595,11 @@ fn available_square_system(
                     PieceType::Bishop => dx == dy,
                     PieceType::Rook => dx == 0 || dy == 0,
                 };
-                if matches && !(dy == 0 && dx == 0) {
+
+                if matches
+                    && !(dy == 0 && dx == 0)
+                    && is_path_clear(selected_piece_position, to_position, &pieces)
+                {
                     commands.entity(entity).insert(Available);
                     sprite.color = colors.green;
                 }
@@ -563,8 +670,42 @@ fn detect_removals(
     colors: Res<Colors>,
 ) {
     for (entity, mut sprite) in removals.iter_mut() {
-        dbg!("ran removal system");
+        // dbg!("ran removal system");
         commands.entity(entity).remove::<NegativeSelectedPiece>();
         sprite.color = colors.dark;
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{is_path_clear, Position};
+
+    #[test]
+    fn test_is_path_clear() {
+        let pieces = vec![&Position { x: 1, y: 1 }, &Position { x: 2, y: 2 }];
+        assert!(!is_path_clear(
+            &Position { x: 0, y: 0 },
+            &Position { x: 3, y: 3 },
+            &pieces
+        ));
+        assert!(is_path_clear(
+            &Position { x: 0, y: 0 },
+            &Position { x: 1, y: 1 },
+            &pieces
+        ));
+        assert!(is_path_clear(
+            &Position { x: 1, y: 1 },
+            &Position { x: 0, y: 0 },
+            &pieces
+        ));
+    }
+    #[test]
+    fn test_is_path_clear_rook() {
+        let pieces = vec![];
+
+        let start = &Position { x: 1, y: 7 };
+        let end = &Position { x: 2, y: 7 };
+
+        assert!(is_path_clear(start, end, &pieces));
     }
 }
