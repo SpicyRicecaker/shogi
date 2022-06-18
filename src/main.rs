@@ -295,7 +295,7 @@ fn reset_square_system(
     }
 }
 
-fn is_path_clear(start: &Position, end: &Position, pieces: &[&Position]) -> bool {
+fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player)], current_player: Player) -> bool {
     let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
         let dy = endy as f32 - starty as f32;
         let dx = endx as f32 - startx as f32;
@@ -311,8 +311,8 @@ fn is_path_clear(start: &Position, end: &Position, pieces: &[&Position]) -> bool
     !pieces
         .iter()
         // do not include the piece itself in consideration
-        .filter(|p| !(p.x == start.x && p.y == start.y))
-        .any(|piece| {
+        .filter(|(p, _)| !(p.x == start.x && p.y == start.y))
+        .any(|(piece, _)| {
             let (this_trajectory_angle, this_trajectory_magnitude) = polar_maker(
                 start.x as f32,
                 start.y as f32,
@@ -332,10 +332,10 @@ fn available_square_system(
     mut commands: Commands,
     mut ev_selected_piece: EventReader<SelectedPieceEvent>,
     mut square_query: Query<(Entity, &mut Sprite, &Position), With<Square>>,
-    piece_query: Query<&Position, With<Piece>>,
+    piece_query: Query<(&Position, &Player), With<Piece>>,
     colors: Res<Colors>,
     selected_piece_query: Query<(&Position, &PieceType, &Player), With<SelectedPiece>>,
-    // turn: Res<Turn>,
+    turn: Res<Turn>,
 ) {
     for e in ev_selected_piece.iter() {
         // if there is no selected piece don't populate anything
@@ -352,9 +352,15 @@ fn available_square_system(
             // dbg!("owner of piece is", *owner);
 
             // create vector of all pieces
-            let pieces: Vec<&Position> = piece_query.iter().collect();
+            let pieces: Vec<(&Position, &Player)> = piece_query.iter().collect();
 
-            for (entity, mut sprite, to_position) in square_query.iter_mut() {
+            for (entity, mut sprite, to_position) in square_query.iter_mut()
+                .filter(|(_,_,to)|
+                    {!pieces
+                        .iter()
+                        .any(|(p,&o)|
+                            {p.x == to.x && p.y == to.y && o == turn.player})}) 
+            {
                 let (dy, dx) = (
                     to_position.y as i32 - selected_piece_position.y as i32,
                     to_position.x as i32 - selected_piece_position.x as i32,
@@ -386,7 +392,7 @@ fn available_square_system(
 
                 if matches
                     && !(dy == 0 && dx == 0)
-                    && is_path_clear(selected_piece_position, to_position, &pieces)
+                    && is_path_clear(selected_piece_position, to_position, &pieces, turn.player)
                 {
                     commands.entity(entity).insert(Available);
                     sprite.color = colors.green;
