@@ -7,7 +7,17 @@ pub struct ClickEvent {
     pub position: Position,
 }
 
-pub struct MoveEvent;
+pub struct MoveEvent {
+    // player that moved the piece
+    player: Player,
+    // position piece was moved to
+    position: Position
+}
+
+pub struct TakeEvent {
+    taker: Player,
+    piece_type: PieceType
+}
 
 // solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
 pub fn window_to_world(
@@ -86,35 +96,91 @@ pub fn mouse_system(
     }
 }
 
+// we should actually just fully delete the position entity instead of trying to mutate it, and
+// have every reserve be unique
+// each reserve has 
+// - sprite
+// - transform
+// - count
+// - piece_type
+pub fn reserve_system(
+    ev_take: EventReader<TakeEvent>,
+    reserve_query: Query<(&mut Reserve, &PieceType, &Owner, &Children)>,
+    reserve_query_child: Query<&mut Sprite>
+) {
+    for e in ev_take.iter() {
+        let (mut reserve, _, _, child) = reserve_query.iter_mut().find(|_, &pt, &o, _| pt == *e.piece_type && o == *e.taker) {
+            reserve.quantity += 1;
+            // update sprite of child
+        }
+    }
+}
+
+// queue move -> take piece -> actually move piece
+
 // system that moves the selected piece to a square
 pub fn move_system(
+    mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
     mut ev_move: EventWriter<MoveEvent>,
-    mut square_query: Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
-    mut selected_piece: Query<(&mut Position, &mut Transform, &Player), With<SelectedPiece>>,
+    mut ev_take: EventWriter<TakeEvent>,
     mut turn: ResMut<Turn>,
+    mut selected_piece: Query<(&mut Position, &mut Transform, &Player), With<SelectedPiece>>,
+    mut set: ParamSet<(
+        // square query
+        Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
+        // pieces query
+        Query<(Entity, &Position, &PieceType), (With<Piece>, Without<SelectedPiece>)>
+    )>
 ) {
     for e in ev_click.iter() {
-        for (entity, position) in square_query.iter_mut() {
-            if position.x == e.position.x && position.y == e.position.y {
-                if let Ok((mut selected_piece_position, mut transform, player)) =
-                    selected_piece.get_single_mut()
-                {
-                    selected_piece_position.x = e.position.x;
-                    selected_piece_position.y = e.position.y;
-
-                    transform.translation = translate_transform(
-                        selected_piece_position.x as f32,
-                        selected_piece_position.y as f32,
-                        player,
-                    );
-
-                    ev_move.send(MoveEvent);
+        if set.p0().iter().any(|(_, p)| p.y == e.position.y && p.x == e.position.x) && selected_piece.get_single().is_ok() {
+            // decide to take the piece
+            {
+                if let Some((entity, _, piece_type)) = set.p1().iter_mut().find(|(_, &p, _)| p == e.position) {
+                    // copy over *some* properties, including
+                    // - who the owner is
+                    // - the piece
+                    // add_to_reserve(&mut commands, turn.player, piece_type);
+                    ev_take.send(TakeEvent {taker: turn.player, piece_type: *piece_type});
                     
-                    turn.player = turn.player.swap();
-                    // need to make sure to remove all available and selected pieces here as well
-                    break;
+                    // then despawn the entity
+                    commands.entity(entity).despawn_recursive();
+                    
+                    // add it to the reserve
+                    // commands.entity(entity).remove::<Position>();
+                    // commands.entity(entity).remove::<Piece>();
+                    // 
+                    // commands.entity(entity).insert(Reserve);
+                    // *owner = turn.player;
+
+                    // also update the sprite of the piece
+                    // transform.translation = translate_transform(
+                    //     // position.x as f32,
+                    //     // position.y as f32,
+                    //     0.0,
+                    //     0.0,
+                    //     &owner,
+                    // );
                 }
+            }
+            
+            // move the piece
+            {
+                let (mut position, mut transform, owner) = selected_piece.single_mut();
+
+                // actually move the piece
+                position.x = e.position.x;
+                position.y = e.position.y;
+
+                transform.translation = translate_transform(
+                    position.x as f32,
+                    position.y as f32,
+                    owner,
+                );
+
+                ev_move.send(MoveEvent {player: turn.player, position: e.position});
+                turn.player = turn.player.swap();
             }
         }
     }

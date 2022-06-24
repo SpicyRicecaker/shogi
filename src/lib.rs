@@ -77,6 +77,12 @@ pub struct Selected;
 #[derive(Component)]
 pub struct Available;
 
+/// If a piece is in reserve, it can be played wheneve
+#[derive(Component)]
+pub struct Reserve {
+    quantity: u8
+}
+
 impl From<char> for PieceType {
     fn from(c: char) -> Self {
         match c {

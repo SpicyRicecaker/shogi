@@ -3,6 +3,7 @@ use bevy::{prelude::*, text::Text2dBounds};
 
 use shogi_rs::{*, mouse::*};
 
+
 fn main() {
     App::new()
         .insert_resource(Colors::default())
@@ -17,6 +18,7 @@ fn main() {
         .add_event::<ClickEvent>()
         .add_event::<SelectedPieceEvent>()
         .add_event::<MoveEvent>()
+        .add_event::<TakeEvent>()
         // default engine stuff end
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
@@ -26,6 +28,8 @@ fn main() {
         .add_system(available_square_system)
         .add_system_to_stage(CoreStage::PostUpdate, move_system)
         .add_system_to_stage(CoreStage::Last, cleanup_move_system)
+        .add_system_to_stage(CoreStage::Last, reserve_system)
+        // .add_system_to_stage(CoreStage::Last, take_piece_after_move_system)
         .add_system(detect_removals)
         .add_system(debug_system)
         .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
@@ -295,7 +299,7 @@ fn reset_square_system(
     }
 }
 
-fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player)], current_player: Player) -> bool {
+fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player)]) -> bool {
     let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
         let dy = endy as f32 - starty as f32;
         let dx = endx as f32 - startx as f32;
@@ -392,7 +396,7 @@ fn available_square_system(
 
                 if matches
                     && !(dy == 0 && dx == 0)
-                    && is_path_clear(selected_piece_position, to_position, &pieces, turn.player)
+                    && is_path_clear(selected_piece_position, to_position, &pieces)
                 {
                     commands.entity(entity).insert(Available);
                     sprite.color = colors.green;
