@@ -3,7 +3,11 @@ use bevy::prelude::*;
 
 pub const SQUARE_LENGTH: f32 = 50.0;
 pub const SQUARE_SIZE: Vec3 = const_vec3!([50.0, 50.0, 0.0]);
-pub const SQUARE_BORDER: f32 = 2.0;
+pub const SQUARE_BORDER: f32 = 8.0;
+
+pub const BOARD_X_OFFSET: f32 = -250.0;
+pub const BOARD_Y_OFFSET: f32 = -200.0;
+pub const RESERVE_X_OFFSET: f32 = 50.0;
 
 pub mod debug;
 pub mod mouse;

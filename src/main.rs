@@ -47,8 +47,8 @@ fn spawn_squares(mut commands: Commands, colors: Res<Colors>) {
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            (i as f32 - 4.5) * SQUARE_LENGTH,
-                            (j as f32 - 4.5) * SQUARE_LENGTH,
+                            i as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
+                            j as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
                             0.0,
                         ),
                         scale: SQUARE_SIZE,
@@ -120,15 +120,15 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
                     sprite: Sprite {
                         color: colors.dark,
                         custom_size: Some(Vec2::new(
-                            SQUARE_LENGTH - 4. * SQUARE_BORDER,
-                            SQUARE_LENGTH - 4. * SQUARE_BORDER,
+                            SQUARE_LENGTH - SQUARE_BORDER,
+                            SQUARE_LENGTH - SQUARE_BORDER,
                         )),
                         ..Default::default()
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            (x as f32 - 4.5) * SQUARE_LENGTH,
-                            (y as f32 - 4.5) * SQUARE_LENGTH,
+                            x as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
+                            y as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
                             1.0,
                         ),
                         ..Default::default()

@@ -28,10 +28,9 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
     let box_size = Size::new(48.0, 48.0);
 
     for player in [Player::Challenging, Player::Residing].into_iter() {
-        let start_x = 50.;
         let start_y = match player {
-            Player::Challenging => -300.,
-            Player::Residing => 250.,
+            Player::Challenging => -50.0 * 1.5,
+            Player::Residing => 50.0 * 9.5,
         };
 
         for (idx, piece_type) in [
@@ -56,8 +55,8 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                     transform: Transform {
                         scale: SQUARE_SIZE,
                         translation: Vec3::new(
-                            start_x + SQUARE_LENGTH * (idx as f32 - 4.5), 
-                            start_y - 4.5, 
+                            RESERVE_X_OFFSET + SQUARE_LENGTH * idx as f32 + BOARD_X_OFFSET, 
+                            start_y + BOARD_Y_OFFSET, 
                             0.
                         ),
                         ..Default::default()
@@ -74,15 +73,15 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                     sprite: Sprite {
                         color: colors.dark,
                         custom_size: Some(Vec2::new(
-                            SQUARE_LENGTH - 4. * SQUARE_BORDER,
-                            SQUARE_LENGTH - 4. * SQUARE_BORDER,
+                            SQUARE_LENGTH - SQUARE_BORDER,
+                            SQUARE_LENGTH - SQUARE_BORDER,
                         )),
                         ..Default::default()
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            start_x + (idx as f32 - 4.5) * SQUARE_LENGTH,
-                            start_y as f32 - 4.5,
+                            RESERVE_X_OFFSET + idx as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
+                            start_y + BOARD_Y_OFFSET,
                             1.0,
                         ),
                         ..Default::default()
