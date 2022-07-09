@@ -6,6 +6,7 @@ pub const SQUARE_SIZE: Vec3 = const_vec3!([50.0, 50.0, 0.0]);
 pub const SQUARE_BORDER: f32 = 2.0;
 
 pub mod mouse;
+pub mod reserve;
 
 pub struct Colors {
     pub dark: Color,
@@ -56,7 +57,7 @@ pub struct Position {
     pub y: usize,
 }
 
-#[derive(Component, Clone, Copy)]
+#[derive(Component, Clone, Copy, PartialEq)]
 pub enum PieceType {
     King,
     Pawn,

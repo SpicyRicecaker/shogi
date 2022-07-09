@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use bevy::{prelude::*, text::Text2dBounds};
 
-use shogi_rs::{*, mouse::*};
+use shogi_rs::{*, mouse::MousePlugin, reserve::ReservePlugin};
 
 
 fn main() {
@@ -9,26 +9,20 @@ fn main() {
         .insert_resource(Colors::default())
         // default engine stuff begin
         .add_plugins(DefaultPlugins)
+        .add_plugin(ReservePlugin)
+        .add_plugin(MousePlugin)
         .add_startup_system(camera)
         .insert_resource(ClearColor(Color::hex("282828").unwrap()))
         .insert_resource(Turn {
             player: Player::Challenging,
         })
         // .insert_resource(SelectedPiece { position: None })
-        .add_event::<ClickEvent>()
         .add_event::<SelectedPieceEvent>()
-        .add_event::<MoveEvent>()
-        .add_event::<TakeEvent>()
         // default engine stuff end
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
         .add_startup_system(spawn_debug)
-        .add_system(mouse_system)
-        .add_system(square_system)
         .add_system(available_square_system)
-        .add_system_to_stage(CoreStage::PostUpdate, move_system)
-        .add_system_to_stage(CoreStage::Last, cleanup_move_system)
-        .add_system_to_stage(CoreStage::Last, reserve_system)
         // .add_system_to_stage(CoreStage::Last, take_piece_after_move_system)
         .add_system(detect_removals)
         .add_system(debug_system)
@@ -229,60 +223,6 @@ fn debug_system(windows: Res<Windows>) {
     // dbg!(window.height(), window.width());
 }
 
-
-
-fn square_system(
-    mut commands: Commands,
-    mut ev_click: EventReader<ClickEvent>,
-    mut piece_query: Query<(Entity, &mut Sprite, &Position, &Player), With<Piece>>,
-    selected_piece: Query<(Entity, &Position), With<SelectedPiece>>,
-    colors: Res<Colors>,
-    mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
-    turn: Res<Turn>,
-) {
-    for e in ev_click.iter() {
-        for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
-            if position.x == e.position.x && position.y == e.position.y {
-                // Prevent other player from clicking.
-                // Turn off for debugging
-                // dbg!("turn player", &turn);
-                if *owner != turn.player {
-                    break;
-                }
-
-                // remove other query
-
-                // set the entity's colors and whatnot,
-                // but only if it isn't the same thing
-                if let Ok((old_selected_piece, old_selected_piece_position)) =
-                    selected_piece.get_single()
-                {
-                    let mut entity_command = commands.entity(old_selected_piece);
-                    entity_command.remove::<SelectedPiece>();
-                    entity_command.insert(NegativeSelectedPiece);
-
-                    if *position != *old_selected_piece_position {
-                        commands.entity(entity).insert(SelectedPiece);
-                        ev_selected_piece.send(SelectedPieceEvent::Change);
-                        sprite.color = colors.blue;
-                        // dbg!("cool");
-                    } else {
-                        // dbg!("nothing");
-                        ev_selected_piece.send(SelectedPieceEvent::None);
-                    }
-                } else {
-                    commands.entity(entity).insert(SelectedPiece);
-                    ev_selected_piece.send(SelectedPieceEvent::Change);
-                    sprite.color = colors.blue;
-                    // dbg!("cool2");
-                };
-
-                break;
-            }
-        }
-        // run system to check if an available square has been clicked
-    }
-}
 
 fn reset_square_system(
     mut commands: Commands,

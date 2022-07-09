@@ -1,4 +1,21 @@
-use crate::*;
+use crate::*; // includes import of bevy's prelude
+
+pub struct MousePlugin;
+
+impl Plugin for MousePlugin {
+    fn build(&self, app: &mut App) {
+        app
+            .add_event::<ClickEvent>()
+            .add_event::<MoveEvent>()
+            .add_event::<TakeEvent>()
+            // detects a click event, converts it into world coords
+            .add_system(mouse_system)
+            // detects a mouse click, tries to map mouse click to specific square
+            .add_system(square_system)
+            .add_system_to_stage(CoreStage::PostUpdate, move_system)
+            .add_system_to_stage(CoreStage::Last, cleanup_move_system);
+    }
+}
 
 // it's hard to do a selected piece without a global resource, because sometimes we might not have a selected piece.
 // regardless, I think that we should try out functional programming in full.
@@ -15,12 +32,12 @@ pub struct MoveEvent {
 }
 
 pub struct TakeEvent {
-    taker: Player,
-    piece_type: PieceType
+    pub taker: Player,
+    pub piece_type: PieceType
 }
 
 // solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
-pub fn window_to_world(
+fn window_to_world(
     screen_position: Vec2,
     window: &Window,
     camera: &Camera,
@@ -44,7 +61,7 @@ pub fn window_to_world(
     world_pos
 }
 
-pub fn mouse_system(
+fn mouse_system(
     square_query: Query<(&Transform, &Position), With<Square>>,
     // selected_piece: Res<SelectedPiece>,
     mut ev_click: EventWriter<ClickEvent>,
@@ -96,30 +113,10 @@ pub fn mouse_system(
     }
 }
 
-// we should actually just fully delete the position entity instead of trying to mutate it, and
-// have every reserve be unique
-// each reserve has 
-// - sprite
-// - transform
-// - count
-// - piece_type
-pub fn reserve_system(
-    ev_take: EventReader<TakeEvent>,
-    reserve_query: Query<(&mut Reserve, &PieceType, &Owner, &Children)>,
-    reserve_query_child: Query<&mut Sprite>
-) {
-    for e in ev_take.iter() {
-        let (mut reserve, _, _, child) = reserve_query.iter_mut().find(|_, &pt, &o, _| pt == *e.piece_type && o == *e.taker) {
-            reserve.quantity += 1;
-            // update sprite of child
-        }
-    }
-}
-
 // queue move -> take piece -> actually move piece
 
 // system that moves the selected piece to a square
-pub fn move_system(
+fn move_system(
     mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
     mut ev_move: EventWriter<MoveEvent>,
@@ -186,7 +183,7 @@ pub fn move_system(
     }
 }
 
-pub fn cleanup_move_system(
+fn cleanup_move_system(
     mut ev_move: EventReader<MoveEvent>,
     mut commands: Commands,
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
@@ -202,5 +199,58 @@ pub fn cleanup_move_system(
             commands.entity(entity).remove::<Available>();
             sprite.color = colors.light;
         }
+    }
+}
+
+fn square_system(
+    mut commands: Commands,
+    mut ev_click: EventReader<ClickEvent>,
+    mut piece_query: Query<(Entity, &mut Sprite, &Position, &Player), With<Piece>>,
+    selected_piece: Query<(Entity, &Position), With<SelectedPiece>>,
+    colors: Res<Colors>,
+    mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
+    turn: Res<Turn>,
+) {
+    for e in ev_click.iter() {
+        for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
+            if position.x == e.position.x && position.y == e.position.y {
+                // Prevent other player from clicking.
+                // Turn off for debugging
+                // dbg!("turn player", &turn);
+                if *owner != turn.player {
+                    break;
+                }
+
+                // remove other query
+
+                // set the entity's colors and whatnot,
+                // but only if it isn't the same thing
+                if let Ok((old_selected_piece, old_selected_piece_position)) =
+                    selected_piece.get_single()
+                {
+                    let mut entity_command = commands.entity(old_selected_piece);
+                    entity_command.remove::<SelectedPiece>();
+                    entity_command.insert(NegativeSelectedPiece);
+
+                    if *position != *old_selected_piece_position {
+                        commands.entity(entity).insert(SelectedPiece);
+                        ev_selected_piece.send(SelectedPieceEvent::Change);
+                        sprite.color = colors.blue;
+                        // dbg!("cool");
+                    } else {
+                        // dbg!("nothing");
+                        ev_selected_piece.send(SelectedPieceEvent::None);
+                    }
+                } else {
+                    commands.entity(entity).insert(SelectedPiece);
+                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                    sprite.color = colors.blue;
+                    // dbg!("cool2");
+                };
+
+                break;
+            }
+        }
+        // run system to check if an available square has been clicked
     }
 }
