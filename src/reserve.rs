@@ -16,21 +16,13 @@ impl Plugin for ReservePlugin {
 
 fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<AssetServer>) {
     let font = asset_server.load("yujiboku.ttf");
-    let text_style = TextStyle {
-        font,
-        font_size: 50.0,
-        color: colors.light,
-    };
-    let text_alignment_center = TextAlignment {
-        vertical: VerticalAlign::Center,
-        horizontal: HorizontalAlign::Center,
-    };
+    
     let box_size = Size::new(48.0, 48.0);
 
     for player in [Player::Challenging, Player::Residing].into_iter() {
         let start_y = match player {
-            Player::Challenging => -50.0 * 1.5,
-            Player::Residing => 50.0 * 9.5,
+            Player::Challenging => - SQUARE_LENGTH * 1.5,
+            Player::Residing => SQUARE_LENGTH * 9.5,
         };
 
         for (idx, piece_type) in [
@@ -71,7 +63,11 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
             commands
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite {
-                        color: colors.dark,
+                        color: {
+                            let mut color = colors.dark.clone();
+                            color.set_a(0.2);
+                            color
+                        },
                         custom_size: Some(Vec2::new(
                             SQUARE_LENGTH - SQUARE_BORDER,
                             SQUARE_LENGTH - SQUARE_BORDER,
@@ -97,8 +93,15 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                     parent.spawn_bundle(Text2dBundle {
                         text: Text::with_section(
                             get_kanji(piece_type, Rank::Regular, player),
-                            text_style.clone(),
-                            text_alignment_center,
+                            TextStyle {
+                                font: font.clone(),
+                                font_size: 50.0,
+                                color: colors.light,
+                            },
+                            TextAlignment {
+                                vertical: VerticalAlign::Center,
+                                horizontal: HorizontalAlign::Center,
+                            }
                         ),
                         text_2d_bounds: Text2dBounds {
                             // Wrap text in the rectangle
@@ -120,11 +123,42 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                         },
                         ..default()
                     });
+                    parent.spawn_bundle(Text2dBundle {
+                        text: Text::with_section(
+                            format!("{}", 0),
+                            TextStyle {
+                                font: font.clone(),
+                                font_size: 25.0,
+                                color: colors.light
+
+                            },
+                            TextAlignment {
+                                vertical: VerticalAlign::Bottom,
+                                horizontal: HorizontalAlign::Right,
+                            },
+                        ),
+                        text_2d_bounds: Text2dBounds {
+                            // Wrap text in the rectangle
+                            size: box_size,
+                        },
+                        // We align text to the top-left, so this transform is the top-left corner of our text. The
+                        // box is centered at box_position, so it is necessary to move by half of the box size to
+                        // keep the text in the box.
+                        transform: Transform {
+                            translation: match player {
+                                Player::Challenging => Vec3::new(20.0, 3.0, 2.0),
+                                Player::Residing => Vec3::new(-20.0, -3.0, 2.0),
+                            },
+                            rotation: match player {
+                                Player::Challenging => Quat::from_rotation_z(0.),
+                                Player::Residing => Quat::from_rotation_z(PI),
+                            },
+                            ..default() // scale: todo!(),
+                        },
+                        ..default()
+                    });
                 });
 
-            // then spawn the piece as a child of the square
-            
-            // then spawn the count as a child of the piece
         }
     }
 }
