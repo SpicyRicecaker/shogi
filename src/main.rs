@@ -1,8 +1,8 @@
 use std::f32::consts::PI;
+
 use bevy::{prelude::*, text::Text2dBounds};
 
-use shogi_rs::{*, mouse::MousePlugin, reserve::ReservePlugin, debug::DebugPlugin};
-
+use shogi_rs::{debug::DebugPlugin, mouse::MousePlugin, reserve::ReservePlugin, *};
 
 fn main() {
     App::new()
@@ -27,7 +27,6 @@ fn main() {
         .add_system_to_stage(CoreStage::Last, available_square_system)
         .run();
 }
-
 
 fn camera(mut commands: Commands) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -63,39 +62,6 @@ fn spawn_squares(mut commands: Commands, colors: Res<Colors>) {
     }
 }
 
-fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
-    match piece_type {
-        PieceType::King => match owner {
-            Player::Challenging => '玉',
-            Player::Residing => '王',
-        },
-        PieceType::Pawn => match rank {
-            Rank::Regular => '歩',
-            Rank::Promoted => 'と',
-        },
-        PieceType::Lance => match rank {
-            Rank::Regular => '香',
-            Rank::Promoted => '杏',
-        },
-        PieceType::Knight => match rank {
-            Rank::Regular => '桂',
-            Rank::Promoted => '今',
-        },
-        PieceType::Silver => match rank {
-            Rank::Regular => '銀',
-            Rank::Promoted => '全',
-        },
-        PieceType::Gold => '金',
-        PieceType::Bishop => match rank {
-            Rank::Regular => '角',
-            Rank::Promoted => '馬',
-        },
-        PieceType::Rook => match rank {
-            Rank::Regular => '飛',
-            Rank::Promoted => '竜',
-        },
-    }
-}
 
 fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<AssetServer>) {
     let font = asset_server.load("yujiboku.ttf");
@@ -141,7 +107,7 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
             if char == '.' {
                 continue;
             }
-            let player = if y <= 3 {
+            let player = if y <= 2 {
                 Player::Challenging
             } else {
                 Player::Residing
@@ -190,16 +156,8 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
                         // keep the text in the box.
                         transform: Transform {
                             translation: match player {
-                                Player::Challenging => Vec3::new(
-                                    0.0,
-                                    2.0,
-                                    2.0,
-                                ),
-                                Player::Residing => Vec3::new(
-                                    0.0,
-                                    -2.0,
-                                    2.0,
-                                ),
+                                Player::Challenging => Vec3::new(0.0, 2.0, 2.0),
+                                Player::Residing => Vec3::new(0.0, -2.0, 2.0),
                             },
                             rotation: match player {
                                 Player::Challenging => Quat::from_rotation_z(0.),
@@ -213,8 +171,6 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
         }
     }
 }
-
-
 
 fn reset_square_system(
     mut commands: Commands,
@@ -290,13 +246,11 @@ fn available_square_system(
             // create vector of all pieces
             let pieces: Vec<(&Position, &Player)> = piece_query.iter().collect();
 
-            for (entity, mut sprite, to_position) in square_query.iter_mut()
-                .filter(|(_,_,to)|
-                    {!pieces
-                        .iter()
-                        .any(|(p,&o)|
-                            {p.x == to.x && p.y == to.y && o == turn.player})}) 
-            {
+            for (entity, mut sprite, to_position) in square_query.iter_mut().filter(|(_, _, to)| {
+                !pieces
+                    .iter()
+                    .any(|(p, &o)| p.x == to.x && p.y == to.y && o == turn.player)
+            }) {
                 let (dy, dx) = (
                     to_position.y as i32 - selected_piece_position.y as i32,
                     to_position.x as i32 - selected_piece_position.x as i32,
@@ -337,8 +291,6 @@ fn available_square_system(
         }
     }
 }
-
-
 
 fn detect_removals(
     mut commands: Commands,

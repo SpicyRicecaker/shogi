@@ -1,13 +1,13 @@
-use bevy::prelude::*;
 use bevy::math::const_vec3;
+use bevy::prelude::*;
 
 pub const SQUARE_LENGTH: f32 = 50.0;
 pub const SQUARE_SIZE: Vec3 = const_vec3!([50.0, 50.0, 0.0]);
 pub const SQUARE_BORDER: f32 = 2.0;
 
+pub mod debug;
 pub mod mouse;
 pub mod reserve;
-pub mod debug;
 
 pub struct Colors {
     pub dark: Color,
@@ -82,7 +82,7 @@ pub struct Available;
 /// If a piece is in reserve, it can be played wheneve
 #[derive(Component)]
 pub struct Reserve {
-    quantity: u8
+    quantity: u8,
 }
 
 impl From<char> for PieceType {
@@ -122,7 +122,6 @@ impl Player {
     }
 }
 
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum SelectedPieceEvent {
     Change,
@@ -141,5 +140,39 @@ pub fn translate_transform(x: f32, y: f32, owner: &Player) -> Vec3 {
             (y as f32 - 4.5) * SQUARE_LENGTH - 2.,
             2.0,
         ),
+    }
+}
+
+pub fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
+    match piece_type {
+        PieceType::King => match owner {
+            Player::Challenging => '玉',
+            Player::Residing => '王',
+        },
+        PieceType::Pawn => match rank {
+            Rank::Regular => '歩',
+            Rank::Promoted => 'と',
+        },
+        PieceType::Lance => match rank {
+            Rank::Regular => '香',
+            Rank::Promoted => '杏',
+        },
+        PieceType::Knight => match rank {
+            Rank::Regular => '桂',
+            Rank::Promoted => '今',
+        },
+        PieceType::Silver => match rank {
+            Rank::Regular => '銀',
+            Rank::Promoted => '全',
+        },
+        PieceType::Gold => '金',
+        PieceType::Bishop => match rank {
+            Rank::Regular => '角',
+            Rank::Promoted => '馬',
+        },
+        PieceType::Rook => match rank {
+            Rank::Regular => '飛',
+            Rank::Promoted => '竜',
+        },
     }
 }

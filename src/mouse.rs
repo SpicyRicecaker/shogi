@@ -4,8 +4,7 @@ pub struct MousePlugin;
 
 impl Plugin for MousePlugin {
     fn build(&self, app: &mut App) {
-        app
-            .add_event::<ClickEvent>()
+        app.add_event::<ClickEvent>()
             .add_event::<MoveEvent>()
             .add_event::<TakeEvent>()
             // detects a click event, converts it into world coords
@@ -28,12 +27,12 @@ pub struct MoveEvent {
     // player that moved the piece
     player: Player,
     // position piece was moved to
-    position: Position
+    position: Position,
 }
 
 pub struct TakeEvent {
     pub taker: Player,
-    pub piece_type: PieceType
+    pub piece_type: PieceType,
 }
 
 // solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
@@ -127,27 +126,37 @@ fn move_system(
         // square query
         Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
         // pieces query
-        Query<(Entity, &Position, &PieceType), (With<Piece>, Without<SelectedPiece>)>
-    )>
+        Query<(Entity, &Position, &PieceType), (With<Piece>, Without<SelectedPiece>)>,
+    )>,
 ) {
     for e in ev_click.iter() {
-        if set.p0().iter().any(|(_, p)| p.y == e.position.y && p.x == e.position.x) && selected_piece.get_single().is_ok() {
+        if set
+            .p0()
+            .iter()
+            .any(|(_, p)| p.y == e.position.y && p.x == e.position.x)
+            && selected_piece.get_single().is_ok()
+        {
             // decide to take the piece
             {
-                if let Some((entity, _, piece_type)) = set.p1().iter_mut().find(|(_, &p, _)| p == e.position) {
+                if let Some((entity, _, piece_type)) =
+                    set.p1().iter_mut().find(|(_, &p, _)| p == e.position)
+                {
                     // copy over *some* properties, including
                     // - who the owner is
                     // - the piece
                     // add_to_reserve(&mut commands, turn.player, piece_type);
-                    ev_take.send(TakeEvent {taker: turn.player, piece_type: *piece_type});
-                    
+                    ev_take.send(TakeEvent {
+                        taker: turn.player,
+                        piece_type: *piece_type,
+                    });
+
                     // then despawn the entity
                     commands.entity(entity).despawn_recursive();
-                    
+
                     // add it to the reserve
                     // commands.entity(entity).remove::<Position>();
                     // commands.entity(entity).remove::<Piece>();
-                    // 
+                    //
                     // commands.entity(entity).insert(Reserve);
                     // *owner = turn.player;
 
@@ -161,7 +170,7 @@ fn move_system(
                     // );
                 }
             }
-            
+
             // move the piece
             {
                 let (mut position, mut transform, owner) = selected_piece.single_mut();
@@ -170,13 +179,13 @@ fn move_system(
                 position.x = e.position.x;
                 position.y = e.position.y;
 
-                transform.translation = translate_transform(
-                    position.x as f32,
-                    position.y as f32,
-                    owner,
-                );
+                transform.translation =
+                    translate_transform(position.x as f32, position.y as f32, owner);
 
-                ev_move.send(MoveEvent {player: turn.player, position: e.position});
+                ev_move.send(MoveEvent {
+                    player: turn.player,
+                    position: e.position,
+                });
                 turn.player = turn.player.swap();
             }
         }
@@ -188,7 +197,7 @@ fn cleanup_move_system(
     mut commands: Commands,
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
     mut selected_piece: Query<(Entity, &mut Sprite), (With<SelectedPiece>, Without<Available>)>,
-    colors: Res<Colors>
+    colors: Res<Colors>,
 ) {
     for e in ev_move.iter() {
         if let Ok((entity, mut sprite)) = selected_piece.get_single_mut() {
