@@ -19,7 +19,7 @@ impl Plugin for ReservePlugin {
 // - transform
 // - count
 // - piece_type
-pub fn reserve_system(
+fn reserve_system(
     mut ev_take: EventReader<TakeEvent>,
     mut reserve_query: Query<(&mut Reserve, &PieceType, &Player, &Children)>,
     reserve_query_child: Query<&mut Sprite>

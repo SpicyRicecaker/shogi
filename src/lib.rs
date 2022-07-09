@@ -7,6 +7,7 @@ pub const SQUARE_BORDER: f32 = 2.0;
 
 pub mod mouse;
 pub mod reserve;
+pub mod debug;
 
 pub struct Colors {
     pub dark: Color,

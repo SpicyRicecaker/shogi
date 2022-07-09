@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 use bevy::{prelude::*, text::Text2dBounds};
 
-use shogi_rs::{*, mouse::MousePlugin, reserve::ReservePlugin};
+use shogi_rs::{*, mouse::MousePlugin, reserve::ReservePlugin, debug::DebugPlugin};
 
 
 fn main() {
@@ -11,21 +11,18 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(ReservePlugin)
         .add_plugin(MousePlugin)
+        .add_plugin(DebugPlugin)
         .add_startup_system(camera)
         .insert_resource(ClearColor(Color::hex("282828").unwrap()))
         .insert_resource(Turn {
             player: Player::Challenging,
         })
-        // .insert_resource(SelectedPiece { position: None })
         .add_event::<SelectedPieceEvent>()
         // default engine stuff end
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
-        .add_startup_system(spawn_debug)
         .add_system(available_square_system)
-        // .add_system_to_stage(CoreStage::Last, take_piece_after_move_system)
         .add_system(detect_removals)
-        .add_system(debug_system)
         .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
         .add_system_to_stage(CoreStage::Last, available_square_system)
         .run();
@@ -217,11 +214,6 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
     }
 }
 
-fn debug_system(windows: Res<Windows>) {
-    // let window = windows.get_primary().unwrap();
-
-    // dbg!(window.height(), window.width());
-}
 
 
 fn reset_square_system(
@@ -347,30 +339,6 @@ fn available_square_system(
 }
 
 
-fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
-    // commands
-    //     .spawn_bundle(SpriteBundle {
-    //         sprite: Sprite {
-    //             color: colors.green,
-    //             // custom_size: Some(Vec2::new(
-    //             //     square_length - square_border,
-    //             // )),
-    //             ..Default::default()
-    //         },
-    //         transform: Transform {
-    //             translation: Vec3::new(
-    //                 -225.,
-    //                 300.,
-    //                 0.0,
-    //             ),
-    //             scale: SQUARE_SIZE,
-    //             ..Default::default()
-    //         },
-    //         ..Default::default()
-    //     });
-    //     // .insert(Position { x: i, y: j })
-    //     // .insert(Square);
-}
 
 fn detect_removals(
     mut commands: Commands,
