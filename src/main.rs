@@ -62,7 +62,6 @@ fn spawn_squares(mut commands: Commands, colors: Res<Colors>) {
     }
 }
 
-
 fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<AssetServer>) {
     let font = asset_server.load("yujiboku.ttf");
     let text_style = TextStyle {

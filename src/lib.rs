@@ -89,6 +89,9 @@ pub struct Reserve {
     quantity: u8,
 }
 
+#[derive(Component)]
+pub struct Counter;
+
 impl From<char> for PieceType {
     fn from(c: char) -> Self {
         match c {
@@ -136,12 +139,12 @@ pub fn translate_transform(x: f32, y: f32, owner: &Player) -> Vec3 {
     match owner {
         Player::Challenging => Vec3::new(
             x * SQUARE_LENGTH + BOARD_X_OFFSET,
-            y * SQUARE_LENGTH + BOARD_Y_OFFSET, // + 2
+            y * SQUARE_LENGTH + BOARD_Y_OFFSET,
             2.0,
         ),
         Player::Residing => Vec3::new(
             x * SQUARE_LENGTH + BOARD_X_OFFSET,
-            y * SQUARE_LENGTH + BOARD_Y_OFFSET, // -.2
+            y * SQUARE_LENGTH + BOARD_Y_OFFSET,
             2.0,
         ),
     }
