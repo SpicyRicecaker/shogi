@@ -135,13 +135,13 @@ pub enum SelectedPieceEvent {
 pub fn translate_transform(x: f32, y: f32, owner: &Player) -> Vec3 {
     match owner {
         Player::Challenging => Vec3::new(
-            (x as f32 - 4.5) * SQUARE_LENGTH,
-            (y as f32 - 4.5) * SQUARE_LENGTH + 2.,
+            x * SQUARE_LENGTH + BOARD_X_OFFSET,
+            y * SQUARE_LENGTH + BOARD_Y_OFFSET, // + 2
             2.0,
         ),
         Player::Residing => Vec3::new(
-            (x as f32 - 4.5) * SQUARE_LENGTH,
-            (y as f32 - 4.5) * SQUARE_LENGTH - 2.,
+            x * SQUARE_LENGTH + BOARD_X_OFFSET,
+            y * SQUARE_LENGTH + BOARD_Y_OFFSET, // -.2
             2.0,
         ),
     }
