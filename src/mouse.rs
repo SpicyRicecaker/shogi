@@ -19,8 +19,9 @@ impl Plugin for MousePlugin {
 // it's hard to do a selected piece without a global resource, because sometimes we might not have a selected piece.
 // regardless, I think that we should try out functional programming in full.
 
-pub struct ClickEvent {
-    pub position: Position,
+pub enum ClickEvent {
+    Board { position: Position },
+    Reserve { piece_type: PieceType, owner: Player },
 }
 
 pub struct MoveEvent {
@@ -61,7 +62,10 @@ fn window_to_world(
 }
 
 fn mouse_system(
-    square_query: Query<(&Transform, &Position), With<Square>>,
+    regular_reserve: ParamSet<(
+        Query<(&Transform, &Position), With<Square>>,
+        Query<(&Transform, &PieceType), With<Square>, Without<Position>>,
+    )>,
     // selected_piece: Res<SelectedPiece>,
     mut ev_click: EventWriter<ClickEvent>,
     buttons: Res<Input<MouseButton>>,
@@ -80,7 +84,7 @@ fn mouse_system(
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
-            for (transform, square_position) in square_query.iter() {
+            for (transform, square_position) in regular_reserve.p0().iter() {
                 let size = transform.scale.x / 2.;
 
                 let square_x = transform.translation.x;
@@ -96,7 +100,7 @@ fn mouse_system(
                     && y <= square_y + size
                 {
                     // println!("square clicked!");
-                    ev_click.send(ClickEvent {
+                    ev_click.send(ClickEvent::Board {
                         position: *square_position,
                     });
                     // DEBUG
@@ -104,6 +108,25 @@ fn mouse_system(
                     break;
                 }
                 // println!("{:#?}", transform.translation);
+            }
+
+            for (transform, &piece_type) in regular_reserve.p1().iter() {
+                let size = transform.scale.x / 2.;
+
+                let square_x = transform.translation.x;
+                let square_y = transform.translation.y;
+                
+                let x = position.x;
+                let y = position.y;
+
+                if x >= square_x - size
+                    && x <= square_x + size
+                    && y >= square_y - size
+                    && y <= square_y + size
+                {
+                    ev_click.send(ClickEvent::Reserve { piece_type });
+                    break;
+                }
             }
 
             // DEBUG
@@ -221,45 +244,53 @@ fn square_system(
     turn: Res<Turn>,
 ) {
     for e in ev_click.iter() {
-        for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
-            if position.x == e.position.x && position.y == e.position.y {
-                // Prevent other player from clicking.
-                // Turn off for debugging
-                // dbg!("turn player", &turn);
-                if *owner != turn.player {
-                    break;
-                }
+        match e {
+            ClickEvent::Board { e_position } => {
+                for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
+                    if position.x == e_position.x && e_position.y == e_position.y {
+                        // Prevent other player from clicking.
+                        // Turn off for debugging
+                        // dbg!("turn player", &turn);
+                        if *owner != turn.player {
+                            break;
+                        }
 
-                // remove other query
+                        // remove other query
 
-                // set the entity's colors and whatnot,
-                // but only if it isn't the same thing
-                if let Ok((old_selected_piece, old_selected_piece_position)) =
-                    selected_piece.get_single()
-                {
-                    let mut entity_command = commands.entity(old_selected_piece);
-                    entity_command.remove::<SelectedPiece>();
-                    entity_command.insert(NegativeSelectedPiece);
+                        // set the entity's colors and whatnot,
+                        // but only if it isn't the same thing
+                        if let Ok((old_selected_piece, old_selected_piece_position)) =
+                            selected_piece.get_single()
+                            {
+                                let mut entity_command = commands.entity(old_selected_piece);
+                                entity_command.remove::<SelectedPiece>();
+                                entity_command.insert(NegativeSelectedPiece);
 
-                    if *position != *old_selected_piece_position {
-                        commands.entity(entity).insert(SelectedPiece);
-                        ev_selected_piece.send(SelectedPieceEvent::Change);
-                        sprite.color = colors.blue;
-                        // dbg!("cool");
-                    } else {
-                        // dbg!("nothing");
-                        ev_selected_piece.send(SelectedPieceEvent::None);
+                                if *position != *old_selected_piece_position {
+                                    commands.entity(entity).insert(SelectedPiece);
+                                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                                    sprite.color = colors.blue;
+                                    // dbg!("cool");
+                                } else {
+                                    // dbg!("nothing");
+                                    ev_selected_piece.send(SelectedPieceEvent::None);
+                                }
+                            } else {
+                                commands.entity(entity).insert(SelectedPiece);
+                                ev_selected_piece.send(SelectedPieceEvent::Change);
+                                sprite.color = colors.blue;
+                                // dbg!("cool2");
+                            };
+
+                        break;
                     }
-                } else {
-                    commands.entity(entity).insert(SelectedPiece);
-                    ev_selected_piece.send(SelectedPieceEvent::Change);
-                    sprite.color = colors.blue;
-                    // dbg!("cool2");
-                };
-
-                break;
+                }
+            }
+            
+            ClickEvent::Reserve { piece_type } => {
             }
         }
+        
         // run system to check if an available square has been clicked
     }
 }
