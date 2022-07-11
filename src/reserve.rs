@@ -38,26 +38,29 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
         .enumerate()
         {
             // first spawn the square
-            commands.spawn_bundle(SpriteBundle {
-                sprite: Sprite {
-                    color: colors.light,
+            commands
+                .spawn_bundle(SpriteBundle {
+                    sprite: Sprite {
+                        color: colors.light,
+                        ..Default::default()
+                    },
+                    transform: Transform {
+                        scale: SQUARE_SIZE,
+                        translation: Vec3::new(
+                            RESERVE_X_OFFSET + SQUARE_LENGTH * idx as f32 + BOARD_X_OFFSET,
+                            start_y + BOARD_Y_OFFSET,
+                            0.,
+                        ),
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                transform: Transform {
-                    scale: SQUARE_SIZE,
-                    translation: Vec3::new(
-                        RESERVE_X_OFFSET + SQUARE_LENGTH * idx as f32 + BOARD_X_OFFSET,
-                        start_y + BOARD_Y_OFFSET,
-                        0.,
-                    ),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-            // .insert(Reserve)
-            // Not sure if we should include the square here, because then we'll need to change
-            // literally every single query
-            // .insert(Square);
+                })
+                // .insert(Reserve)
+                // Not sure if we should include the square here, because then we'll need to change
+                // literally every single query
+                .insert(Square)
+                .insert(piece_type)
+                .insert(player);
             // then spawn the piece, with the wood, kanji, and count
             commands
                 .spawn_bundle(SpriteBundle {

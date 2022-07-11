@@ -62,7 +62,7 @@ pub struct Position {
     pub y: usize,
 }
 
-#[derive(Component, Clone, Copy, PartialEq)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 pub enum PieceType {
     King,
     Pawn,

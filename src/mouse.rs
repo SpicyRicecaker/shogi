@@ -5,12 +5,15 @@ pub struct MousePlugin;
 impl Plugin for MousePlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<ClickEvent>()
+            .add_event::<ReserveClickEvent>()
             .add_event::<MoveEvent>()
             .add_event::<TakeEvent>()
             // detects a click event, converts it into world coords
             .add_system(mouse_system)
+            .add_system(reserve_mouse_system)
             // detects a mouse click, tries to map mouse click to specific square
             .add_system(square_system)
+            .add_system(reserve_square_system)
             .add_system_to_stage(CoreStage::PostUpdate, move_system)
             .add_system_to_stage(CoreStage::Last, cleanup_move_system);
     }
@@ -21,6 +24,12 @@ impl Plugin for MousePlugin {
 
 pub struct ClickEvent {
     pub position: Position,
+}
+
+#[derive(Debug)]
+pub struct ReserveClickEvent {
+    pub piece_type: PieceType,
+    pub owner: Player,
 }
 
 pub struct MoveEvent {
@@ -215,7 +224,10 @@ fn square_system(
     mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
     mut piece_query: Query<(Entity, &mut Sprite, &Position, &Player), With<Piece>>,
-    selected_piece: Query<(Entity, &Position), With<SelectedPiece>>,
+    mut selected_piece: ParamSet<(
+        Query<(Entity, &Position), (With<SelectedPiece>, Without<Available>)>,
+        Query<(Entity, &Reserve), (With<SelectedPiece>, Without<Available>)>,
+    )>,
     colors: Res<Colors>,
     mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
     turn: Res<Turn>,
@@ -235,7 +247,7 @@ fn square_system(
                 // set the entity's colors and whatnot,
                 // but only if it isn't the same thing
                 if let Ok((old_selected_piece, old_selected_piece_position)) =
-                    selected_piece.get_single()
+                    selected_piece.p0().get_single()
                 {
                     let mut entity_command = commands.entity(old_selected_piece);
                     entity_command.remove::<SelectedPiece>();
@@ -250,15 +262,119 @@ fn square_system(
                         // dbg!("nothing");
                         ev_selected_piece.send(SelectedPieceEvent::None);
                     }
+                } else if let Ok((old_sel_pc_e, reserve)) = selected_piece.p1().get_single() {
+                    commands.entity(old_sel_pc_e).remove::<SelectedPiece>();
+                    commands.entity(old_sel_pc_e).insert(NegativeSelectedPiece);
+
+                    commands.entity(entity).insert(SelectedPiece);
+                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                    sprite.color = colors.blue;
                 } else {
                     commands.entity(entity).insert(SelectedPiece);
                     ev_selected_piece.send(SelectedPieceEvent::Change);
                     sprite.color = colors.blue;
-                    // dbg!("cool2");
                 };
 
                 break;
             }
+        }
+        // run system to check if an available square has been clicked
+    }
+}
+
+fn reserve_mouse_system(
+    square_query: Query<(&Transform, &Player, &PieceType), With<Square>>,
+    mut ev_click: EventWriter<ReserveClickEvent>,
+    buttons: Res<Input<MouseButton>>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    windows: Res<Windows>,
+) {
+    // there can be a selected piece, but there's no such thing as a selected square
+    let window = windows.get_primary().unwrap();
+
+    if let Some(position) = window.cursor_position() {
+        let (camera, camera_transform) = camera.single();
+        let position = window_to_world(position, window, camera, camera_transform);
+        if buttons.just_pressed(MouseButton::Left) {
+            // println!("mouse just got clicked at {:#?}", position);
+            // try to match it to a square
+            // from x to x + scale, cursor position
+            // from y to y + scale, cursor position
+            if let Some((transform, &owner, &piece_type)) =
+                square_query.iter().find(|(transform, _, _)| {
+                    let size = transform.scale.x / 2.;
+
+                    let square_x = transform.translation.x;
+                    let square_y = transform.translation.y;
+
+                    let x = position.x;
+                    let y = position.y;
+
+                    // dbg!(transform, square_position);
+                    x >= square_x - size
+                        && x <= square_x + size
+                        && y >= square_y - size
+                        && y <= square_y + size
+                })
+            {
+                // Send a taker 2 event
+                ev_click.send(ReserveClickEvent { piece_type, owner });
+            }
+
+            // DEBUG
+            // println!("DBG: Square clicked at {:#?}", position);
+        }
+    }
+}
+
+fn reserve_square_system(
+    mut commands: Commands,
+    mut ev_click: EventReader<ReserveClickEvent>,
+    mut piece_query: Query<
+        (Entity, &mut Sprite, &PieceType, &Player, &Reserve),
+        Without<SelectedPiece>,
+    >,
+    mut sel_pc_q: Query<(Entity, &PieceType, &mut Sprite), With<SelectedPiece>>,
+    pos_q: Query<&Position>,
+    mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
+    colors: Res<Colors>,
+    turn: Res<Turn>,
+) {
+    for e in ev_click.iter() {
+        if let Some((entity, mut sprite, piece_type, owner, reserve)) = piece_query
+            .iter_mut()
+            .filter(|(_, _, _, &o, _)| o == turn.player && o == e.owner)
+            .find(|(entity, sprite, &piece_type, owner, _)| piece_type == e.piece_type)
+        {
+            println!("cool shit");
+            if let Ok((sel_pc_e, piece_type, mut sprite)) = sel_pc_q.get_single_mut() {
+                if reserve.quantity > 0 {
+                    if pos_q.get(entity).is_ok() {
+                        let mut entity_command = commands.entity(sel_pc_e);
+                        entity_command.remove::<SelectedPiece>();
+                        entity_command.insert(NegativeSelectedPiece);
+
+                        ev_selected_piece.send(SelectedPieceEvent::Change);
+                    } else {
+                        commands.entity(sel_pc_e).remove::<SelectedPiece>();
+                        commands.entity(sel_pc_e).insert(NegativeSelectedPiece);
+
+                        commands.entity(entity).insert(SelectedPiece);
+
+                        ev_selected_piece.send(SelectedPieceEvent::Change);
+
+                        sprite.color = colors.blue;
+                    }
+                }
+            } else {
+                commands.entity(entity).insert(SelectedPiece);
+
+                ev_selected_piece.send(SelectedPieceEvent::Change);
+
+                sprite.color = colors.blue;
+            }
+            // // set the entity's colors and whatnot,
+            // // but only if it isn't the same thing
         }
         // run system to check if an available square has been clicked
     }
