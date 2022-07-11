@@ -10,7 +10,7 @@ impl Plugin for MousePlugin {
             // detects a click event, converts it into world coords
             .add_system(mouse_system)
             // detects a mouse click, tries to map mouse click to specific square
-            .add_system(square_system)
+            .add_system(board_square_system)
             .add_system_to_stage(CoreStage::PostUpdate, move_system)
             .add_system_to_stage(CoreStage::Last, cleanup_move_system);
     }
@@ -19,9 +19,8 @@ impl Plugin for MousePlugin {
 // it's hard to do a selected piece without a global resource, because sometimes we might not have a selected piece.
 // regardless, I think that we should try out functional programming in full.
 
-pub enum ClickEvent {
-    Board { position: Position },
-    Reserve { piece_type: PieceType, owner: Player },
+pub struct ClickEvent {
+    position: Vec2
 }
 
 pub struct MoveEvent {
@@ -42,7 +41,7 @@ fn window_to_world(
     window: &Window,
     camera: &Camera,
     camera_transform: &GlobalTransform,
-) -> Vec2 {
+    ) -> Vec2 {
     // get the size of the window
     let window_size = Vec2::new(window.width() as f32, window.height() as f32);
 
@@ -63,16 +62,15 @@ fn window_to_world(
 
 fn mouse_system(
     regular_reserve: ParamSet<(
-        Query<(&Transform, &Position), With<Square>>,
-        Query<(&Transform, &PieceType), With<Square>, Without<Position>>,
-    )>,
-    // selected_piece: Res<SelectedPiece>,
-    mut ev_click: EventWriter<ClickEvent>,
-    buttons: Res<Input<MouseButton>>,
-    // we need the camera vector to normalize things
-    camera: Query<(&Camera, &GlobalTransform)>,
-    windows: Res<Windows>,
-) {
+        Query<(&Transform, &PieceType), (With<Square>, Without<Position>)>,
+        )>,
+        // selected_piece: Res<SelectedPiece>,
+        mut ev_click: EventWriter<ClickEvent>,
+        buttons: Res<Input<MouseButton>>,
+        // we need the camera vector to normalize things
+        camera: Query<(&Camera, &GlobalTransform)>,
+        windows: Res<Windows>,
+        ) {
     // there can be a selected piece, but there's no such thing as a selected square
     let window = windows.get_primary().unwrap();
 
@@ -80,54 +78,11 @@ fn mouse_system(
         let (camera, camera_transform) = camera.single();
         let position = window_to_world(position, window, camera, camera_transform);
         if buttons.just_pressed(MouseButton::Left) {
+            ev_click.send(ClickEvent { position });
             // println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
-            for (transform, square_position) in regular_reserve.p0().iter() {
-                let size = transform.scale.x / 2.;
-
-                let square_x = transform.translation.x;
-                let square_y = transform.translation.y;
-
-                let x = position.x;
-                let y = position.y;
-
-                // dbg!(transform, square_position);
-                if x >= square_x - size
-                    && x <= square_x + size
-                    && y >= square_y - size
-                    && y <= square_y + size
-                {
-                    // println!("square clicked!");
-                    ev_click.send(ClickEvent::Board {
-                        position: *square_position,
-                    });
-                    // DEBUG
-                    // println!("DBG: Square clicked at {:#?}", *square_position);
-                    break;
-                }
-                // println!("{:#?}", transform.translation);
-            }
-
-            for (transform, &piece_type) in regular_reserve.p1().iter() {
-                let size = transform.scale.x / 2.;
-
-                let square_x = transform.translation.x;
-                let square_y = transform.translation.y;
-                
-                let x = position.x;
-                let y = position.y;
-
-                if x >= square_x - size
-                    && x <= square_x + size
-                    && y >= square_y - size
-                    && y <= square_y + size
-                {
-                    ev_click.send(ClickEvent::Reserve { piece_type });
-                    break;
-                }
-            }
 
             // DEBUG
             // println!("DBG: Square clicked at {:#?}", position);
@@ -150,68 +105,82 @@ fn move_system(
         Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
         // pieces query
         Query<(Entity, &Position, &PieceType), (With<Piece>, Without<SelectedPiece>)>,
-    )>,
-) {
+        )>,
+        ) {
     for e in ev_click.iter() {
+
         if set
             .p0()
-            .iter()
-            .any(|(_, p)| p.y == e.position.y && p.x == e.position.x)
-            && selected_piece.get_single().is_ok()
-        {
-            // decide to take the piece
-            {
-                if let Some((entity, _, piece_type)) =
-                    set.p1().iter_mut().find(|(_, &p, _)| p == e.position)
+                .iter()
+                .any(|(_, p)| {
+            let size = transform.scale.x / 2.;
+
+            let square_x = transform.translation.x;
+            let square_y = transform.translation.y;
+
+            let x = position.x;
+            let y = position.y;
+
+            x >= square_x - size
+                && x <= square_x + size
+                && y >= square_y - size
+                && y <= square_y + size
+                })
+                && selected_piece.get_single().is_ok()
                 {
-                    // copy over *some* properties, including
-                    // - who the owner is
-                    // - the piece
-                    // add_to_reserve(&mut commands, turn.player, piece_type);
-                    ev_take.send(TakeEvent {
-                        taker: turn.player,
-                        piece_type: *piece_type,
-                    });
+                    // decide to take the piece
+                    {
+                        if let Some((entity, _, piece_type)) =
+                            set.p1().iter_mut().find(|(_, &p, _)| p == e.position)
+                            {
+                                // copy over *some* properties, including
+                                // - who the owner is
+                                // - the piece
+                                // add_to_reserve(&mut commands, turn.player, piece_type);
+                                ev_take.send(TakeEvent {
+                                    taker: turn.player,
+                                    piece_type: *piece_type,
+                                });
 
-                    // then despawn the entity
-                    commands.entity(entity).despawn_recursive();
+                                // then despawn the entity
+                                commands.entity(entity).despawn_recursive();
 
-                    // add it to the reserve
-                    // commands.entity(entity).remove::<Position>();
-                    // commands.entity(entity).remove::<Piece>();
-                    //
-                    // commands.entity(entity).insert(Reserve);
-                    // *owner = turn.player;
+                                // add it to the reserve
+                                // commands.entity(entity).remove::<Position>();
+                                // commands.entity(entity).remove::<Piece>();
+                                //
+                                // commands.entity(entity).insert(Reserve);
+                                // *owner = turn.player;
 
-                    // also update the sprite of the piece
-                    // transform.translation = translate_transform(
-                    //     // position.x as f32,
-                    //     // position.y as f32,
-                    //     0.0,
-                    //     0.0,
-                    //     &owner,
-                    // );
+                                // also update the sprite of the piece
+                                // transform.translation = translate_transform(
+                                //     // position.x as f32,
+                                //     // position.y as f32,
+                                //     0.0,
+                                //     0.0,
+                                //     &owner,
+                                // );
+                            }
+                    }
+
+                    // move the piece
+                    {
+                        let (mut position, mut transform, owner) = selected_piece.single_mut();
+
+                        // actually move the piece
+                        position.x = e.position.x;
+                        position.y = e.position.y;
+
+                        transform.translation =
+                            translate_transform(position.x as f32, position.y as f32, owner);
+
+                        ev_move.send(MoveEvent {
+                            player: turn.player,
+                            position: e.position,
+                        });
+                        turn.player = turn.player.swap();
+                    }
                 }
-            }
-
-            // move the piece
-            {
-                let (mut position, mut transform, owner) = selected_piece.single_mut();
-
-                // actually move the piece
-                position.x = e.position.x;
-                position.y = e.position.y;
-
-                transform.translation =
-                    translate_transform(position.x as f32, position.y as f32, owner);
-
-                ev_move.send(MoveEvent {
-                    player: turn.player,
-                    position: e.position,
-                });
-                turn.player = turn.player.swap();
-            }
-        }
     }
 }
 
@@ -221,7 +190,7 @@ fn cleanup_move_system(
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
     mut selected_piece: Query<(Entity, &mut Sprite), (With<SelectedPiece>, Without<Available>)>,
     colors: Res<Colors>,
-) {
+    ) {
     for e in ev_move.iter() {
         if let Ok((entity, mut sprite)) = selected_piece.get_single_mut() {
             commands.entity(entity).remove::<SelectedPiece>();
@@ -234,63 +203,86 @@ fn cleanup_move_system(
     }
 }
 
-fn square_system(
+// takes in a mouse click, and tries to select a square based off of it.
+// 
+// when given a selected piece,
+//  first check if that piece has a position
+//  otherwise it's a piece from reserve
+fn board_square_system(
     mut commands: Commands,
     mut ev_click: EventReader<ClickEvent>,
     mut piece_query: Query<(Entity, &mut Sprite, &Position, &Player), With<Piece>>,
-    selected_piece: Query<(Entity, &Position), With<SelectedPiece>>,
+    mut square_query: Query<(&Transform, &Position), With<Square>>,
+    mut selected_piece: Query<(Entity, &mut Sprite), With<SelectedPiece>>,
+    mut pos_q: Query<&mut Position>,
     colors: Res<Colors>,
-    mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
+    // mut ev_selected_piece: EventWriter<SelectedPieceEvent>,
     turn: Res<Turn>,
-) {
+    ) {
+
     for e in ev_click.iter() {
-        match e {
-            ClickEvent::Board { e_position } => {
-                for (entity, mut sprite, position, owner) in piece_query.iter_mut() {
-                    if position.x == e_position.x && e_position.y == e_position.y {
-                        // Prevent other player from clicking.
-                        // Turn off for debugging
-                        // dbg!("turn player", &turn);
-                        if *owner != turn.player {
-                            break;
-                        }
+        // if there's a square that matches click
+        if let Some((transform, position)) = square_query.iter().find(|(transform, position)| {
+            let size = transform.scale.x / 2.;
 
-                        // remove other query
+            let square_x = transform.translation.x;
+            let square_y = transform.translation.y;
 
-                        // set the entity's colors and whatnot,
-                        // but only if it isn't the same thing
-                        if let Ok((old_selected_piece, old_selected_piece_position)) =
-                            selected_piece.get_single()
-                            {
-                                let mut entity_command = commands.entity(old_selected_piece);
-                                entity_command.remove::<SelectedPiece>();
-                                entity_command.insert(NegativeSelectedPiece);
+            let x = position.x;
+            let y = position.y;
 
-                                if *position != *old_selected_piece_position {
+            x >= square_x - size
+                && x <= square_x + size
+                && y >= square_y - size
+                && y <= square_y + size
+        }) {
+            // If there's a piece at that square's position
+            if let Some((entity, mut sprite, pc_pos, owner)) = piece_query.iter_mut()
+                .filter(|(_, _, _, &owner)| owner == turn.player)
+                .find(|(_, _, position, _)| { position.x == position.x && position.y == position.y }) {
+                    let mut new_sel_pc = false; 
+                    // If we have a selected piece
+                    if let Ok((old_selected_piece, mut old_sel_sprite)) =
+                        selected_piece.get_single()
+                        {
+                            // Remove the other selected piece
+                            commands.entity(old_selected_piece).remove::<SelectedPiece>();
+                            // TODO Also probably need to remove all other squares with the available
+                            // square
+                            old_sel_sprite.color = colors.dark;
+
+                            // Set the new selected piece, but only if it's not itself
+                            if let Some(sel_pos) = pos_q.get(old_selected_piece) {
+                                if *pc_pos != sel_pos {
                                     commands.entity(entity).insert(SelectedPiece);
-                                    ev_selected_piece.send(SelectedPieceEvent::Change);
                                     sprite.color = colors.blue;
-                                    // dbg!("cool");
-                                } else {
-                                    // dbg!("nothing");
-                                    ev_selected_piece.send(SelectedPieceEvent::None);
-                                }
+                                    new_sel_pc = true;
+                                } 
                             } else {
+                                // This means that the previous selected was generated from
+                                // reserve
                                 commands.entity(entity).insert(SelectedPiece);
-                                ev_selected_piece.send(SelectedPieceEvent::Change);
                                 sprite.color = colors.blue;
-                                // dbg!("cool2");
-                            };
+                                new_sel_pc = true;
+                            }
+                        } 
+                    // If we have no selected piece, also select this square
+                    else {
+                        commands.entity(entity).insert(SelectedPiece);
+                        sprite.color = colors.blue;
+                        new_sel_pc = true;
+                    };
 
-                        break;
-                    }
-                }
-            }
-            
-            ClickEvent::Reserve { piece_type } => {
-            }
-        }
-        
-        // run system to check if an available square has been clicked
+                    // New sel piece, generate available
+                };
+            // Actually, I wonder if we even need this sht
+            // I think I originally had this because lishogi behavior means that the piece above
+            // the square gets selected
+
+        };
+
+
     }
+
+    // run system to check if an available square has been clicked
 }

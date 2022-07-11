@@ -22,7 +22,7 @@ fn main() {
         .add_startup_system(spawn_squares)
         .add_startup_system(spawn_pieces)
         .add_system(available_square_system)
-        .add_system(detect_removals)
+        // .add_system(detect_removals)
         .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
         .add_system_to_stage(CoreStage::Last, available_square_system)
         .run();
@@ -291,17 +291,17 @@ fn available_square_system(
     }
 }
 
-fn detect_removals(
-    mut commands: Commands,
-    mut removals: Query<(Entity, &mut Sprite), With<NegativeSelectedPiece>>,
-    colors: Res<Colors>,
-) {
-    for (entity, mut sprite) in removals.iter_mut() {
-        // dbg!("ran removal system");
-        commands.entity(entity).remove::<NegativeSelectedPiece>();
-        sprite.color = colors.dark;
-    }
-}
+// fn detect_removals(
+//     mut commands: Commands,
+//     mut removals: Query<(Entity, &mut Sprite), With<NegativeSelectedPiece>>,
+//     colors: Res<Colors>,
+// ) {
+//     for (entity, mut sprite) in removals.iter_mut() {
+//         // dbg!("ran removal system");
+//         commands.entity(entity).remove::<NegativeSelectedPiece>();
+//         sprite.color = colors.dark;
+//     }
+// }
 
 #[cfg(test)]
 mod test {
