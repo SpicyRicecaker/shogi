@@ -12,6 +12,9 @@ pub const RESERVE_X_OFFSET: f32 = 50.0;
 pub mod debug;
 pub mod mouse;
 pub mod reserve;
+pub mod regular;
+#[cfg(test)]
+pub mod tests;
 
 pub struct Colors {
     pub dark: Color,
@@ -182,4 +185,37 @@ pub fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
             Rank::Promoted => '竜',
         },
     }
+}
+
+pub fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player)]) -> bool {
+    let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
+        let dy = endy as f32 - starty as f32;
+        let dx = endx as f32 - startx as f32;
+
+        ((dy).atan2(dx), (dy.powi(2) + dx.powi(2)).sqrt())
+    };
+
+    let (trajectory_angle, trajectory_magnitude) =
+        polar_maker(start.x as f32, start.y as f32, end.x as f32, end.y as f32);
+
+    // dbg!("runinng");
+
+    !pieces
+        .iter()
+        // do not include the piece itself in consideration
+        .filter(|(p, _)| !(p.x == start.x && p.y == start.y))
+        .any(|(piece, _)| {
+            let (this_trajectory_angle, this_trajectory_magnitude) = polar_maker(
+                start.x as f32,
+                start.y as f32,
+                piece.x as f32,
+                piece.y as f32,
+            );
+
+            // dbg!(this_trajectory_angle, trajectory_angle);
+            // dbg!(this_trajectory_magnitude, trajectory_magnitude);
+
+            this_trajectory_angle == trajectory_angle
+                && this_trajectory_magnitude < trajectory_magnitude
+        })
 }
