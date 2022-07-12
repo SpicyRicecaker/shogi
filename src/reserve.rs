@@ -264,8 +264,44 @@ fn available_square_system(
                     // 1. it is not on the last row, and
                     // - for challenging, ne 8, for residing, ne 0
                     // 2. that square is not within the hashmap
-                },
-                _ => panic!("unimplemented piece lol"),
+                }
+                PieceType::Bishop | PieceType::Rook | PieceType::Gold | PieceType::Silver => {
+                    free_squares
+                        .into_iter()
+                        .for_each(|(entity, mut sprite, position)| {
+                            commands.entity(entity).insert(Available);
+                            sprite.color = colors.green;
+                        });
+                }
+                PieceType::Lance => {
+                    free_squares
+                        .into_iter()
+                        // disallow last row
+                        .filter(|(_, _, p)| match turn.player {
+                            Player::Challenging => p.y != 8,
+                            Player::Residing => p.y != 0,
+                        })
+                        // I have a feeling that manually inserting this is terrible
+                        .for_each(|(entity, mut sprite, position)| {
+                            commands.entity(entity).insert(Available);
+                            sprite.color = colors.green;
+                        });
+                }
+                PieceType::Knight => {
+                    free_squares
+                        .into_iter()
+                        // disallow last two rows
+                        .filter(|(_, _, p)| match turn.player {
+                            Player::Challenging => p.y <= 6,
+                            Player::Residing => p.y >= 2,
+                        })
+                        // I have a feeling that manually inserting this is terrible
+                        .for_each(|(entity, mut sprite, position)| {
+                            commands.entity(entity).insert(Available);
+                            sprite.color = colors.green;
+                        });
+                }
+                _ => unreachable!(),
             }
         }
     }
