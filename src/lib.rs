@@ -59,7 +59,7 @@ pub struct NegativeSelectedPiece;
 #[derive(Component)]
 pub struct Piece;
 
-#[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     pub x: usize,
     pub y: usize,
@@ -111,7 +111,7 @@ impl From<char> for PieceType {
     }
 }
 
-#[derive(Component)]
+#[derive(Component, PartialEq, Eq)]
 pub enum Rank {
     Regular,
     Promoted,
