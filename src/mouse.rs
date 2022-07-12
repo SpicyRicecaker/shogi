@@ -1,4 +1,6 @@
-use crate::*; // includes import of bevy's prelude
+use crate::*;
+use bevy::text::Text2dBounds;
+use core::f32::consts::PI; // includes import of bevy's prelude
 
 pub struct MousePlugin;
 
@@ -130,19 +132,37 @@ fn move_system(
     mut ev_move: EventWriter<MoveEvent>,
     mut ev_take: EventWriter<TakeEvent>,
     mut turn: ResMut<Turn>,
-    mut selected_piece: Query<(&mut Position, &mut Transform, &Player), With<SelectedPiece>>,
+    mut selected_piece: Query<
+        (
+            Entity,
+            &mut Transform,
+            &Player,
+            &mut Sprite,
+            &PieceType,
+            &Children,
+        ),
+        With<SelectedPiece>,
+    >,
+    mut pos_q: Query<&mut Position, With<SelectedPiece>>,
+    mut res_q: Query<&mut Reserve, With<SelectedPiece>>,
+    mut q_counter: Query<&mut Text, With<Counter>>,
     mut set: ParamSet<(
         // square query
         Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
         // pieces query
         Query<(Entity, &Position, &PieceType), (With<Piece>, Without<SelectedPiece>)>,
     )>,
+    colors: Res<Colors>,
+    asset_server: Res<AssetServer>,
 ) {
     for e in ev_click.iter() {
         if set
             .p0()
             .iter()
             .any(|(_, p)| p.y == e.position.y && p.x == e.position.x)
+            // might be a bit of a redundant check, since there wouldn't be any
+            // available squares if there was no selected piece in the first
+            // place
             && selected_piece.get_single().is_ok()
         {
             // decide to take the piece
@@ -182,15 +202,116 @@ fn move_system(
 
             // move the piece
             {
-                let (mut position, mut transform, owner) = selected_piece.single_mut();
+                let x = e.position.x;
+                let y = e.position.y;
+                let (entity, mut transform, player, mut sprite, piece_type, children) =
+                    selected_piece.single_mut();
 
-                // actually move the piece
-                position.x = e.position.x;
-                position.y = e.position.y;
+                if let Ok(mut position) = pos_q.get_mut(entity) {
+                    // if the position we're moving to is within the enemy's backrank, promote if we haven't already
 
-                transform.translation =
-                    translate_transform(position.x as f32, position.y as f32, owner);
+                    // actually move the piece
+                    position.x = x;
+                    position.y = y;
 
+                    transform.translation =
+                        translate_transform(position.x as f32, position.y as f32, player);
+                    sprite.color = colors.dark;
+                } else {
+                    let mut reserve = res_q.get_mut(entity).unwrap();
+
+                    let font = asset_server.load("yujiboku.ttf");
+                    let text_style = TextStyle {
+                        font,
+                        font_size: 50.0,
+                        color: colors.light,
+                    };
+                    let text_alignment_center = TextAlignment {
+                        vertical: VerticalAlign::Center,
+                        horizontal: HorizontalAlign::Center,
+                    };
+                    let box_size = Size::new(48.0, 48.0);
+
+                    // decrement reserve
+                    reserve.quantity -= 1;
+                    if reserve.quantity == 0 {
+                        // dbg!(&entity, &transform, &player, &sprite, &piece_type);
+                        // sprite.color.set_a(0.2);
+                        // dbg!("updated", &sprite);
+                        sprite.color = {
+                            let mut dark = colors.dark;
+                            dark.set_a(0.2);
+                            dark
+                        };
+                    } else {
+                        sprite.color = colors.dark;
+                    }
+                    for &child in children.iter() {
+                        if let Ok(mut text) = q_counter.get_mut(child) {
+                            text.sections
+                                .get_mut(0)
+                                .expect("error getting text field of reserve counter entity")
+                                .value = format!("{}", reserve.quantity);
+                        }
+                    }
+
+                    commands
+                        .spawn_bundle(SpriteBundle {
+                            sprite: Sprite {
+                                color: colors.dark,
+                                custom_size: Some(Vec2::new(
+                                    SQUARE_LENGTH - SQUARE_BORDER,
+                                    SQUARE_LENGTH - SQUARE_BORDER,
+                                )),
+                                ..Default::default()
+                            },
+                            transform: Transform {
+                                translation: Vec3::new(
+                                    x as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
+                                    y as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
+                                    1.0,
+                                ),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        })
+                        .insert(*piece_type)
+                        .insert(*player)
+                        .insert(Rank::Regular)
+                        .insert(Position { x, y })
+                        .insert(Piece)
+                        .with_children(|parent| {
+                            parent.spawn_bundle(Text2dBundle {
+                                text: Text::with_section(
+                                    get_kanji(*piece_type, Rank::Regular, *player),
+                                    text_style.clone(),
+                                    text_alignment_center,
+                                ),
+                                text_2d_bounds: Text2dBounds {
+                                    // Wrap text in the rectangle
+                                    size: box_size,
+                                },
+                                // We align text to the top-left, so this transform is the top-left corner of our text. The
+                                // box is centered at box_position, so it is necessary to move by half of the box size to
+                                // keep the text in the box.
+                                transform: Transform {
+                                    translation: match *player {
+                                        Player::Challenging => Vec3::new(0.0, 2.0, 2.0),
+                                        Player::Residing => Vec3::new(0.0, -2.0, 2.0),
+                                    },
+                                    rotation: match *player {
+                                        Player::Challenging => Quat::from_rotation_z(0.),
+                                        Player::Residing => Quat::from_rotation_z(PI),
+                                    },
+                                    ..default() // scale: todo!(),
+                                },
+                                ..default()
+                            });
+                        });
+                    // generate a new piece at this specifc postion
+                }
+
+                commands.entity(entity).remove::<SelectedPiece>();
                 ev_move.send(MoveEvent {
                     player: turn.player,
                     position: e.position,
@@ -201,6 +322,9 @@ fn move_system(
     }
 }
 
+// Ensures that after a move, the piece that was moved is desselected. We need
+// this, because otherwise, on the next players turn they might have their
+// opponent's piece selected
 fn cleanup_move_system(
     mut ev_move: EventReader<MoveEvent>,
     mut commands: Commands,
@@ -209,10 +333,10 @@ fn cleanup_move_system(
     colors: Res<Colors>,
 ) {
     for e in ev_move.iter() {
-        if let Ok((entity, mut sprite)) = selected_piece.get_single_mut() {
-            commands.entity(entity).remove::<SelectedPiece>();
-            sprite.color = colors.dark;
-        }
+        // if let Ok((entity, mut sprite)) = selected_piece.get_single_mut() {
+        //     commands.entity(entity).remove::<SelectedPiece>();
+        //     sprite.color = colors.dark;
+        // }
         for (entity, mut sprite) in available_squares.iter_mut() {
             commands.entity(entity).remove::<Available>();
             sprite.color = colors.light;
