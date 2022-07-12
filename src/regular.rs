@@ -226,7 +226,7 @@ fn available_square_system(
                         dxdy.iter()
                             .any(|&[ddx, ddy]| ddx == dx && ddy * *owner as i32 == dy)
                     }
-                    PieceType::Bishop => dx == dy,
+                    PieceType::Bishop => dx == dy || -dx == dy,
                     PieceType::Rook => dx == 0 || dy == 0,
                 };
 

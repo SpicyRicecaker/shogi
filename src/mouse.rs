@@ -241,7 +241,6 @@ fn square_system(
                 if *owner != turn.player {
                     break;
                 }
-
                 // remove other query
 
                 // set the entity's colors and whatnot,

@@ -264,8 +264,8 @@ fn available_square_system(
                     // 1. it is not on the last row, and
                     // - for challenging, ne 8, for residing, ne 0
                     // 2. that square is not within the hashmap
-                }
-                _ => todo!(),
+                },
+                _ => panic!("unimplemented piece lol"),
             }
         }
     }
