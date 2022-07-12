@@ -140,12 +140,13 @@ fn move_system(
             &mut Sprite,
             &PieceType,
             &Children,
+            &mut Rank,
         ),
         With<SelectedPiece>,
     >,
     mut pos_q: Query<&mut Position, With<SelectedPiece>>,
     mut res_q: Query<&mut Reserve, With<SelectedPiece>>,
-    mut q_counter: Query<&mut Text, With<Counter>>,
+    mut q_txt: ParamSet<(Query<&mut Text, With<Counter>>, Query<&mut Text>)>,
     mut set: ParamSet<(
         // square query
         Query<(Entity, &Position), (With<Available>, Without<SelectedPiece>)>,
@@ -204,11 +205,32 @@ fn move_system(
             {
                 let x = e.position.x;
                 let y = e.position.y;
-                let (entity, mut transform, player, mut sprite, piece_type, children) =
+
+                let (entity, mut transform, player, mut sprite, piece_type, children, mut rank) =
                     selected_piece.single_mut();
 
                 if let Ok(mut position) = pos_q.get_mut(entity) {
                     // if the position we're moving to is within the enemy's backrank, promote if we haven't already
+                    if match *player {
+                        Player::Residing => y <= 2,
+                        Player::Challenging => y >= 6,
+                    } {
+                        *rank = Rank::Promoted;
+
+                        // update text
+                        for child in children.iter() {
+                            if let Ok(mut text) = q_txt.p1().get_mut(*child) {
+                                let mut sec = text
+                                    .sections
+                                    .get_mut(0)
+                                    .expect("error getting text field of reserve counter entity");
+                                sec.value =
+                                    get_kanji(*piece_type, Rank::Promoted, *player).to_string();
+                                sec.style.color = colors.red;
+                            }
+                        }
+                        // update color
+                    }
 
                     // actually move the piece
                     position.x = x;
@@ -247,7 +269,7 @@ fn move_system(
                         sprite.color = colors.dark;
                     }
                     for &child in children.iter() {
-                        if let Ok(mut text) = q_counter.get_mut(child) {
+                        if let Ok(mut text) = q_txt.p0().get_mut(child) {
                             text.sections
                                 .get_mut(0)
                                 .expect("error getting text field of reserve counter entity")
