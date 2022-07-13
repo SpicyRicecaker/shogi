@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use bevy::text::Text2dBounds;
 
 use crate::*;
@@ -170,76 +172,280 @@ fn reset_square_system(
     }
 }
 
-fn available_square_system(
-    mut commands: Commands,
-    mut ev_selected_piece: EventReader<SelectedPieceEvent>,
-    mut square_query: Query<(Entity, &mut Sprite, &Position), With<Square>>,
-    piece_query: Query<(&Position, &Player), With<Piece>>,
-    colors: Res<Colors>,
-    selected_piece_query: Query<(&Position, &PieceType, &Player), With<SelectedPiece>>,
-    turn: Res<Turn>,
-) {
-    for e in ev_selected_piece.iter() {
-        // if there is no selected piece don't populate anything
-        if *e == SelectedPieceEvent::None {
-            // dbg!("123123123");
-            break;
+// ECS is so fucking useful by the way
+// Is there anyway we can do this without making a struct like this?
+
+enum XSelectedPiece {
+    Board {
+        p: Position,
+        o: Player,
+        r: Rank,
+        t: PieceType,
+    },
+    Reserve {
+        r: Reserve,
+        o: Player,
+        t: PieceType,
+    },
+}
+
+fn available_squares_iter(
+    sel_pc: XSelectedPiece,
+    reserve: &[(&Reserve, &Player, &PieceType)],
+    pcs: &[(&Position, &Player, &Rank, &PieceType)],
+    squares: Vec<Position>,
+) -> Vec<Position> {
+    match sel_pc {
+        XSelectedPiece::Board {
+            p: p_sel,
+            o: o_sel,
+            r: r_sel,
+            t: t_sel,
+        } => {
+            // ignore self pieces
+            let pcs_set: HashSet<Position> = pcs
+                .iter()
+                .filter(|(_, o, _, _)| **o == o_sel)
+                .map(|(p, _, _, _)| **p)
+                .collect();
+
+            squares
+                .iter()
+                .filter(|p| {
+                    // remove the possibility of going to squares that are already owned
+                    **p != p_sel && !pcs_set.contains(p)
+                })
+                .filter(|to_pos| {
+                    let (dy, dx) = (
+                        to_pos.y as i32 - p_sel.y as i32,
+                        to_pos.x as i32 - p_sel.x as i32,
+                    );
+
+                    let matches = match r_sel {
+                        Rank::Regular => match t_sel {
+                            PieceType::King => (-1..=1).contains(&dx) && (-1..=1).contains(&dy),
+                            PieceType::Pawn => dx == 0 && dy == o_sel as i32,
+                            PieceType::Lance => match o_sel {
+                                Player::Challenging => dx == 0 && dy >= 1,
+                                Player::Residing => dx == 0 && dy <= -1,
+                            },
+                            PieceType::Knight => (dx == 1 || dx == -1) && dy == o_sel as i32 * 2,
+                            PieceType::Silver => {
+                                let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, -1], [1, -1]];
+
+                                dxdy.iter()
+                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                            }
+                            PieceType::Gold => {
+                                let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0]];
+
+                                dxdy.iter()
+                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                            }
+                            PieceType::Bishop => dx == dy || -dx == dy,
+                            PieceType::Rook => dx == 0 || dy == 0,
+                        },
+                        // make sure to trim
+                        Rank::Promoted => match t_sel {
+                            PieceType::King => unreachable!(),
+                            // gold movement
+                            PieceType::Pawn
+                            | PieceType::Lance
+                            | PieceType::Gold
+                            | PieceType::Silver
+                            | PieceType::Knight => {
+                                let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0]];
+
+                                dxdy.iter()
+                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                            }
+                            // add corner squares
+                            PieceType::Bishop => dx == dy || -dx == dy || {
+                                let dxdy = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+                                dxdy.iter()
+                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                            },
+                            PieceType::Rook => dx == 0 || dy == 0 || {
+                                let dxdy = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+
+                                dxdy.iter()
+                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                            },
+                        },
+                    };
+
+                    let pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
+                        pcs.iter().map(|tup| *tup).collect();
+                    matches && is_path_clear(&p_sel, &to_pos, &pcs[..])
+                    // {
+                    // do this later, in the function with the query where we're
+                    // calling this
+                    // commands.entity(entity).insert(Available);
+                    // sprite.color = colors.green;
+                    // }
+                })
+                .map(|p| *p)
+                .collect()
         }
-        // dbg!("ran available square system");
+        XSelectedPiece::Reserve {
+            r: r_sel,
+            t: t_sel,
+            o: o_sel,
+        } => {
+            // two ways we can go about this
+            //
+            // 1.
+            // turn squares into a hashmap
+            // then iterate over pieces and remove keys from the hashmap
+            //
+            // 2.
+            // turn pieces into a hashmap
+            // iterate over squares, then filter them with pieces
+            //
+            // the end goal is to create a vector of squares, so 2 seems to make more sense since
+            // we can collect at the end
 
-        // DEBUG
-        if let Ok((selected_piece_position, selected_piece_type, owner)) =
-            selected_piece_query.get_single()
-        {
-            // dbg!("owner of piece is", *owner);
+            // create list of squares which are not occupied by pieces
+            let free_squares: Vec<Position> = {
+                let pcs: HashSet<Position> = pcs.iter().map(|(p, o, r, t)| **p).collect();
+                squares.into_iter().filter(|p| !pcs.contains(&p)).collect()
+            };
 
-            // create vector of all pieces
-            let pieces: Vec<(&Position, &Player)> = piece_query.iter().collect();
+            // completely ignore all pieces
+            match t_sel {
+                PieceType::Pawn => {
+                    let player_pawns: HashSet<usize> = pcs
+                        .iter()
+                        .filter(|(_, o, r, t)| {
+                            **o == o_sel && **r == Rank::Regular && **t == PieceType::Pawn
+                        })
+                        .map(|(p, _, _, _)| p.x)
+                        .collect();
 
-            for (entity, mut sprite, to_position) in square_query.iter_mut().filter(|(_, _, to)| {
-                !pieces
-                    .iter()
-                    .any(|(p, &o)| p.x == to.x && p.y == to.y && o == turn.player)
-            }) {
-                let (dy, dx) = (
-                    to_position.y as i32 - selected_piece_position.y as i32,
-                    to_position.x as i32 - selected_piece_position.x as i32,
-                );
+                    free_squares
+                        .into_iter()
+                        .filter(|p| match o_sel {
+                            Player::Challenging => p.y != 8,
+                            Player::Residing => p.y != 0,
+                        } && !player_pawns.contains(&p.x))
+                        .collect()
 
-                let matches = match selected_piece_type {
-                    PieceType::King => (-1..=1).contains(&dx) && (-1..=1).contains(&dy),
-                    PieceType::Pawn => dx == 0 && dy == *owner as i32,
-                    PieceType::Lance => match owner {
-                        Player::Challenging => dx == 0 && dy >= 1,
-                        Player::Residing => dx == 0 && dy <= -1,
-                    },
-                    PieceType::Knight => (dx == 1 || dx == -1) && dy == *owner as i32 * 2,
-                    PieceType::Silver => {
-                        let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, -1], [1, -1]];
-
-                        dxdy.iter()
-                            .any(|&[ddx, ddy]| ddx == dx && ddy * *owner as i32 == dy)
-                    }
-                    PieceType::Gold => {
-                        let dxdy = [[-1, 1], [0, 1], [1, 1], [-1, 0], [1, 0]];
-
-                        dxdy.iter()
-                            .any(|&[ddx, ddy]| ddx == dx && ddy * *owner as i32 == dy)
-                    }
-                    PieceType::Bishop => dx == dy || -dx == dy,
-                    PieceType::Rook => dx == 0 || dy == 0,
-                };
-
-                if matches
-                    && !(dy == 0 && dx == 0)
-                    && is_path_clear(selected_piece_position, to_position, &pieces)
-                {
-                    commands.entity(entity).insert(Available);
-                    sprite.color = colors.green;
+                    // for pawn, we want to generate a hashset using the x values of the pawns (unpromoted) of the current player,
+                    //
+                    // then only allow the pawn to be placed on that square if
+                    // 1. it is not on the last row, and
+                    // - for challenging, ne 8, for residing, ne 0
+                    // 2. that square is not within the hashmap
                 }
+                PieceType::Bishop | PieceType::Rook | PieceType::Gold | PieceType::Silver => {
+                    free_squares
+                }
+                PieceType::Lance => {
+                    free_squares
+                        .into_iter()
+                        // disallow last row
+                        .filter(|p| match o_sel {
+                            Player::Challenging => p.y != 8,
+                            Player::Residing => p.y != 0,
+                        })
+                        .collect()
+                }
+                PieceType::Knight => {
+                    free_squares
+                        .into_iter()
+                        // disallow last two rows
+                        .filter(|p| match o_sel {
+                            Player::Challenging => p.y <= 6,
+                            Player::Residing => p.y >= 2,
+                        })
+                        .collect()
+                }
+                _ => unreachable!(),
             }
         }
     }
+}
+
+fn available_square_system(
+    mut commands: Commands,
+    mut ev_selected_piece: EventReader<SelectedPieceEvent>,
+    mut square_query: ParamSet<(
+        Query<&Position, With<Square>>,
+        Query<(Entity, &mut Sprite, &Position), With<Square>>,
+    )>,
+    piece_query: Query<(&Position, &Player, &Rank, &PieceType), With<Piece>>,
+    reserve_q: Query<(&Reserve, &Player, &PieceType), With<Piece>>,
+    colors: Res<Colors>,
+    sel_pc_q: Query<(Entity, &Player, &Rank, &PieceType), With<SelectedPiece>>,
+    pos_q: Query<&Position, With<SelectedPiece>>,
+    res_q: Query<&Reserve, With<SelectedPiece>>,
+    turn: Res<Turn>,
+) {
+    ev_selected_piece
+        .iter()
+        // if there is no selected piece don't populate anything
+        .filter(|e| **e != SelectedPieceEvent::None)
+        .for_each(|e| {
+            // never fails, since we checked earlier
+            let (e, o, r, t) = sel_pc_q.single();
+
+            let squares: Vec<Position> = square_query.p0().iter().map(|p| *p).collect();
+
+            let available_squares = if let Ok(p) = pos_q.get(e) {
+                let sel_pc = XSelectedPiece::Board {
+                    p: *p,
+                    o: *o,
+                    r: *r,
+                    t: *t,
+                };
+                let reserve: Vec<(&Reserve, &Player, &PieceType)> = reserve_q.iter().collect();
+                let mut pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
+                    piece_query.iter().collect();
+                pcs.push((p, o, r, t));
+
+                available_squares_iter(sel_pc, &reserve, &pcs, squares)
+            } else if let Ok(r) = res_q.get(e) {
+                let sel_pc = XSelectedPiece::Reserve {
+                    r: *r,
+                    o: *o,
+                    t: *t,
+                };
+                let mut reserve: Vec<(&Reserve, &Player, &PieceType)> = reserve_q.iter().collect();
+                reserve.push((r, o, t));
+                let pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
+                    piece_query.iter().collect();
+
+                available_squares_iter(sel_pc, &reserve, &pcs, squares)
+            } else {
+                unreachable!();
+            };
+
+            if available_squares.is_empty() {
+                // // declare game state as won, exit process, probably
+                // // DEBUG
+                // println!(
+                //     "{:?} won, gg.",
+                //     match turn.player {
+                //         Player::Residing => "challenging",
+                //         Player::Challenging => "residing",
+                //     }
+                // );
+                // std::process::exit(0);
+            } else {
+                let pos_set: HashSet<Position> = available_squares.into_iter().collect();
+
+                // match the squares with sprites against the hashmap we generate here
+                square_query
+                    .p1()
+                    .iter_mut()
+                    .filter(|(_, _, p)| pos_set.contains(p))
+                    .for_each(|(e, mut s, _)| {
+                        commands.entity(e).insert(Available);
+                        s.color = colors.green;
+                    });
+            }
+        });
 }
 
 fn detect_removals(
@@ -253,3 +459,14 @@ fn detect_removals(
         sprite.color = colors.dark;
     }
 }
+
+// FIXME need to disallow taking the king
+
+// need a way to limit the amount of available squares based off of if moving
+// that square will lead to the king being still in check currently or becoming
+// checked (because there's a pin in place)
+// this is actually pretty difficult, since we will have to check the available squares of a bord in the future
+// Find available squares needs to
+// 1. Take in a vector of pieces and a vector of reserves, instead of querying things
+// 2. Needs to return an iterator (or vector, or whatever) of available pieces instead of actually mutating things
+// We 100 % need to make this a recursive function, since because of the dynamicity of shogi, there's an untold number of moves that can be made with the reserve

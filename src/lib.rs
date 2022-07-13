@@ -87,7 +87,7 @@ pub struct Selected;
 pub struct Available;
 
 /// If a piece is in reserve, it can be played wheneve
-#[derive(Component)]
+#[derive(Debug, Component, Clone, Copy)]
 pub struct Reserve {
     quantity: u8,
 }
@@ -111,7 +111,7 @@ impl From<char> for PieceType {
     }
 }
 
-#[derive(Component, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub enum Rank {
     Regular,
     Promoted,
@@ -187,7 +187,7 @@ pub fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
     }
 }
 
-pub fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player)]) -> bool {
+pub fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player, &Rank, &PieceType)]) -> bool {
     let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
         let dy = endy as f32 - starty as f32;
         let dx = endx as f32 - startx as f32;
@@ -203,8 +203,8 @@ pub fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Pl
     !pieces
         .iter()
         // do not include the piece itself in consideration
-        .filter(|(p, _)| !(p.x == start.x && p.y == start.y))
-        .any(|(piece, _)| {
+        .filter(|(p, _, _, _)| !(p.x == start.x && p.y == start.y))
+        .any(|(piece, _, _, _)| {
             let (this_trajectory_angle, this_trajectory_magnitude) = polar_maker(
                 start.x as f32,
                 start.y as f32,
