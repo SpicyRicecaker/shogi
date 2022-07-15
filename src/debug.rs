@@ -34,7 +34,6 @@ fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
 }
 
 fn debug_system(reserve: Query<(&Reserve, &Player, &PieceType)>) {
-    for reserve in reserve.iter() {
-        dbg!(reserve);
-    }
+    // let vec: Vec<(&Reserve, &Player, &PieceType)> = reserve.iter().filter(|&(r, o, t)| r.quantity > 0).collect();
+    // dbg!(&vec);
 }

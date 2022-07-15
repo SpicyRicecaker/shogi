@@ -306,24 +306,15 @@ fn move_to_position(
             o: o_sel,
             t: t_sel,
         } => {
-            let vec = reserve
-                .iter()
-                .copied()
-                .collect::<Vec<(Reserve, Player, PieceType)>>();
-            // dbg!(&vec);
             if let Some((r, o, t)) = reserve
                 .iter_mut()
-                .find(|(_, o, t)| *o == o_sel && *t == t_sel)
+                .find(|(r, o, t)| r.quantity > 0 && *o == o_sel && *t == t_sel)
             {
-                // if r_sel.quantity > 0 {
                 r_sel.quantity -= 1;
+                *r = r_sel;
 
-                // dbg!(r_sel.quantity, r_sel, o_sel, t_sel);
                 // decrement reserve
                 pcs.push((to_position, o_sel, Rank::Regular, t_sel));
-
-                *r = r_sel;
-                // };
             } else {
                 panic!();
             }
@@ -759,12 +750,12 @@ fn check_win_system(
                             squares.clone(),
                         )
                         .iter()
-                        .any(|&p| {
+                        .filter_map(|&p| {
                             let mut pcs = pcs.clone();
                             let mut reserve = reserve.clone();
                             let squares = squares.clone();
 
-                            dbg!("1231231313123123");
+                            // dbg!("1231231313123123");
                             move_to_position(sel_pc, p, &mut reserve, &mut pcs, squares.clone());
 
                             // find king piece again
@@ -777,14 +768,17 @@ fn check_win_system(
                                 unreachable!()
                             };
 
-                            !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares)
-                        })
+                            if !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares) {
+                                Some(3)
+                            } else {
+                                None
+                            }
+                        }).count() != 0
                     })
                     && !reserve
                         .iter()
                         .filter(|&&(r, o, _)| o == turn.player && r.quantity > 0)
                         .any(|&(r, o, t)| {
-                            dbg!("hello ");
                             let sel_pc = XSelectedPiece::Reserve { r, o, t };
 
                             available_squares_iter(
@@ -794,12 +788,12 @@ fn check_win_system(
                                 squares.clone(),
                             )
                             .iter()
-                            .any(|&p| {
+                            .filter_map(|&p| {
                                 let mut pcs = pcs.clone();
                                 let mut reserve = reserve.clone();
                                 let squares = squares.clone();
 
-                                dbg!("123123123");
+                                // dbg!("123123123");
                                 move_to_position(
                                     sel_pc,
                                     p,
@@ -818,8 +812,12 @@ fn check_win_system(
                                     unreachable!()
                                 };
 
-                                !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares)
-                            })
+                                if !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares) {
+                                    Some(3)
+                                } else {
+                                    None
+                                }
+                            }).count() != 0
                         })
                 // also add check for things in bench
                 {

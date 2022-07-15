@@ -351,7 +351,7 @@ fn move_system(
 // opponent's piece selected
 fn cleanup_move_system(
     mut ev_move: EventReader<MoveEvent>,
-    // mut ev_win: EventWriter<DoneEvent>,
+    mut ev_win: EventWriter<DoneEvent>,
     mut commands: Commands,
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
     mut selected_piece: Query<(Entity, &mut Sprite), (With<SelectedPiece>, Without<Available>)>,
@@ -366,6 +366,7 @@ fn cleanup_move_system(
             commands.entity(entity).remove::<Available>();
             sprite.color = colors.light;
         }
+        ev_win.send(DoneEvent);
     }
 }
 
@@ -490,35 +491,31 @@ fn reserve_square_system(
     colors: Res<Colors>,
     turn: Res<Turn>,
 ) {
+    // e is the clicked on square
     for e in ev_click.iter() {
+        // entity, sprite, piece_type, owner, reserve : every reserve holds these traits
         if let Some((entity, mut sprite, piece_type, owner, reserve)) = piece_query
             .iter_mut()
-            .filter(|(_, _, _, &o, _)| o == turn.player && o == e.owner)
-            .find(|(entity, sprite, &piece_type, owner, _)| piece_type == e.piece_type)
+            .find(|(_, _, &t, &o, &r)| t == e.piece_type && o == turn.player && o == e.owner && r.quantity > 0)
         {
             // println!("cool shit");
             if let Ok((sel_pc_e, piece_type, mut sprite)) = sel_pc_q.get_single_mut() {
-                if reserve.quantity > 0 {
-                    if pos_q.get(entity).is_ok() {
-                        println!("previous selected has a position on the board");
-                        let mut entity_command = commands.entity(sel_pc_e);
-                        entity_command.remove::<SelectedPiece>();
-                        entity_command.insert(NegativeSelectedPiece);
+                if pos_q.get(entity).is_ok() {
+                    let mut entity_command = commands.entity(sel_pc_e);
+                    entity_command.remove::<SelectedPiece>();
+                    entity_command.insert(NegativeSelectedPiece);
 
-                        ev_selected_piece.send(SelectedPieceEvent::Change);
-                        sprite.color = colors.blue;
-                    } else {
-                        println!("previous selected was cool");
-                        commands.entity(sel_pc_e).remove::<SelectedPiece>();
-                        commands.entity(sel_pc_e).insert(NegativeSelectedPiece);
+                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                    sprite.color = colors.blue;
+                } else {
+                    commands.entity(sel_pc_e).remove::<SelectedPiece>();
+                    commands.entity(sel_pc_e).insert(NegativeSelectedPiece);
 
-                        commands.entity(entity).insert(SelectedPiece);
-                        ev_selected_piece.send(SelectedPieceEvent::Change);
-                        sprite.color = colors.blue;
-                    }
+                    commands.entity(entity).insert(SelectedPiece);
+                    ev_selected_piece.send(SelectedPieceEvent::Change);
+                    sprite.color = colors.blue;
                 }
             } else {
-                println!("previous selected does not exist");
                 commands.entity(entity).insert(SelectedPiece);
                 ev_selected_piece.send(SelectedPieceEvent::Change);
                 sprite.color = colors.blue;
