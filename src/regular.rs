@@ -237,13 +237,18 @@ fn move_to_position(
 ) {
     match sel_pc {
         XSelectedPiece::Board {
-            p: mut p_sel,
+            p: p_sel,
             o: o_sel,
             r: mut r_sel,
             t: t_sel,
         } => {
+            let mut i = None;
             // if the position we're moving to is occupied, take the piece
-            if let Some(&(p, o, r, t)) = pcs.iter().find(|&&(p, _, _, _)| p == to_position) {
+            if let Some((idx, &(p, o, r, t))) = pcs
+                .iter()
+                .enumerate()
+                .find(|(idx, &(p, _, _, _))| p == to_position)
+            {
                 // find the piece in reserve which matches the taken piece and increment it
                 // double `&&` might error here
                 if let Some((mut r_res, _, _)) = reserve
@@ -251,30 +256,44 @@ fn move_to_position(
                     .find(|(_, o_res, t_res)| *t_res == t && *o_res == o_sel)
                 {
                     r_res.quantity += 1;
+                    // remove the piece from the board lol
+                    // this is a reason why having pcs separate from reserve is
+                    // not beneficial, technically pieces are never created nor
+                    // destroyed in shogi, nor chess
                 }
+                i = Some(idx);
+            }
+            if let Some(i) = i {
+                pcs.remove(i);
             }
 
             // then move the selected piece
-            {
-                let x = to_position.x;
-                let y = to_position.y;
+            let x = to_position.x;
+            let y = to_position.y;
 
-                // if the position we're moving to is within the enemy's backrank, promote if we haven't already
-                if match o_sel {
-                    Player::Residing => y <= 2,
-                    Player::Challenging => y >= 6,
-                } {
-                    r_sel = Rank::Promoted;
-                }
-
-                p_sel.x = x;
-                p_sel.y = y;
+            // if the position we're moving to is within the enemy's backrank, promote if we haven't already
+            if match o_sel {
+                Player::Residing => y <= 2,
+                Player::Challenging => y >= 6,
+            } {
+                r_sel = Rank::Promoted;
             }
+
+            // p_sel.x = x;
+            // p_sel.y = y;
 
             // add the selected piece to the board (VERY BAD HACK, BECAUSE
             // LITERALLY EVERY OTHER FUNCTION ASSUMES THAT THE SELECTED PIECE IS
             // NOT ACTUALLY PART OF THE BOARD SO CARE)
-            pcs.push((p_sel, o_sel, r_sel, t_sel));
+            if let Some((p, _, r, _)) = pcs
+                .iter_mut()
+                .find(|(p, o, _, t)| *p == p_sel && *o == o_sel && *t == t_sel)
+            {
+                p.x = x;
+                p.y = y;
+
+                *r = r_sel;
+            }
         }
         XSelectedPiece::Reserve {
             r: mut r_sel,
@@ -298,11 +317,11 @@ fn available_squares_iter_parent(
         XSelectedPiece::Board { o, .. } => o,
         XSelectedPiece::Reserve { o, .. } => o,
     };
-            // dbg!("123123123", pcs
-            //     .iter()
-            //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
-            //     .copied()
-            //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
+    // dbg!("123123123", pcs
+    //     .iter()
+    //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
+    //     .copied()
+    //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
     // for each naive square, create a new board where those pieces are moved, then check if the king is not under check
     available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone())
         .into_iter()
@@ -333,7 +352,7 @@ fn available_squares_iter_parent(
             //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
             //     .copied()
             //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
-            
+
             // if pcs
             //     .iter()
             //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
@@ -569,9 +588,6 @@ fn available_square_system(
         // if there is no selected piece don't populate anything
         .filter(|e| **e != SelectedPieceEvent::None)
         .for_each(|e| {
-
-            
-
             // dbg!("hello world kappa", piece_query
             //     .iter()
             //     .filter(|&(_, o, _, t)| *o == turn.player && *t == PieceType::King)
