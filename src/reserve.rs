@@ -3,6 +3,7 @@ use std::f32::consts::PI;
 use bevy::{prelude::*, text::Text2dBounds};
 
 use crate::mouse::*;
+use crate::regular::DoneEvent;
 use crate::*;
 
 pub struct ReservePlugin;
@@ -174,6 +175,7 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
 // - piece_type
 fn reserve_system(
     mut ev_take: EventReader<TakeEvent>,
+    // mut ev_done: EventWriter<DoneEvent>,
     mut q_child: Query<(&mut Sprite, &mut Reserve, &PieceType, &Player, &Children)>,
     mut q_counter: Query<&mut Text, With<Counter>>,
 ) {
@@ -194,5 +196,6 @@ fn reserve_system(
                 }
             }
         }
+        // ev_done.send(DoneEvent);
     }
 }

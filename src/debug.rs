@@ -33,8 +33,8 @@ fn spawn_debug(mut commands: Commands, colors: Res<Colors>) {
     //     // .insert(Square);
 }
 
-fn debug_system(windows: Res<Windows>) {
-    // let window = windows.get_primary().unwrap();
-
-    // dbg!(window.height(), window.width());
+fn debug_system(reserve: Query<(&Reserve, &Player, &PieceType)>) {
+    for reserve in reserve.iter() {
+        dbg!(reserve);
+    }
 }

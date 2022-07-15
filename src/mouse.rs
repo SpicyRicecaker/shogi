@@ -1,4 +1,6 @@
 use crate::*;
+
+use crate::regular::DoneEvent;
 use bevy::text::Text2dBounds;
 use core::f32::consts::PI; // includes import of bevy's prelude
 
@@ -21,7 +23,7 @@ impl Plugin for MousePlugin {
     }
 }
 
-// it's hard to do a selected piece without a global resource, because sometimes we might not have a selected piece.
+// it's hard to do a selected piece without a global resource, becaus sometimes we might not have a selected piece.
 // regardless, I think that we should try out functional programming in full.
 
 pub struct ClickEvent {
@@ -349,6 +351,7 @@ fn move_system(
 // opponent's piece selected
 fn cleanup_move_system(
     mut ev_move: EventReader<MoveEvent>,
+    // mut ev_win: EventWriter<DoneEvent>,
     mut commands: Commands,
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
     mut selected_piece: Query<(Entity, &mut Sprite), (With<SelectedPiece>, Without<Available>)>,
@@ -394,7 +397,7 @@ fn square_system(
                 if let Ok((old_selected_piece, old_selected_piece_position)) =
                     selected_piece.p0().get_single()
                 {
-                    println!("old was a square");
+                    // println!("old was a square");
                     let mut entity_command = commands.entity(old_selected_piece);
                     entity_command.remove::<SelectedPiece>();
                     entity_command.insert(NegativeSelectedPiece);
@@ -409,7 +412,7 @@ fn square_system(
                         ev_selected_piece.send(SelectedPieceEvent::None);
                     }
                 } else if let Ok((old_sel_pc_e, reserve)) = selected_piece.p1().get_single() {
-                    println!("old was a square");
+                    // println!("old was a square");
                     commands.entity(old_sel_pc_e).remove::<SelectedPiece>();
                     commands.entity(old_sel_pc_e).insert(NegativeSelectedPiece);
 

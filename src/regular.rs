@@ -7,14 +7,18 @@ use core::f32::consts::PI;
 
 pub struct RegularPlugin;
 
+pub struct DoneEvent;
+
 impl Plugin for RegularPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<SelectedPieceEvent>()
+            .add_event::<DoneEvent>()
             .add_startup_system(spawn_squares)
             .add_startup_system(spawn_pieces)
             .add_system(detect_removals)
             .add_system_to_stage(CoreStage::PostUpdate, reset_square_system)
-            .add_system_to_stage(CoreStage::Last, available_square_system);
+            .add_system_to_stage(CoreStage::Last, available_square_system)
+            .add_system_to_stage(CoreStage::Last, check_win_system);
     }
 }
 
@@ -64,28 +68,28 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
 
     let box_size = Size::new(48.0, 48.0);
 
-    let pieces = r##"
-    lnsgkgsnl
-    .r.....b.
-    ppppppppp
-    .........
-    .........
-    .........
-    ppppppppp
-    .b.....r.
-    lnsgkgsnl
-    "##;
     // let pieces = r##"
-    // .........
-    // .r.......
-    // .........
-    // .........
-    // .........
+    // lnsgkgsnl
+    // .r.....b.
+    // ppppppppp
     // .........
     // .........
     // .........
-    // .........
+    // ppppppppp
+    // .b.....r.
+    // lnsgkgsnl
     // "##;
+    let pieces = r##"
+    r...k....
+    .........
+    .........
+    .........
+    .........
+    .........
+    p........
+    r........
+    r...k...r
+    "##;
 
     for (y, line) in pieces.trim().lines().rev().enumerate() {
         for (x, char) in line.trim().chars().enumerate() {
@@ -293,6 +297,8 @@ fn move_to_position(
                 p.y = y;
 
                 *r = r_sel;
+            } else {
+                panic!("hello world 123123123")
             }
         }
         XSelectedPiece::Reserve {
@@ -300,9 +306,27 @@ fn move_to_position(
             o: o_sel,
             t: t_sel,
         } => {
-            // decrement reserve
-            r_sel.quantity -= 1;
-            pcs.push((to_position, o_sel, Rank::Regular, t_sel));
+            let vec = reserve
+                .iter()
+                .copied()
+                .collect::<Vec<(Reserve, Player, PieceType)>>();
+            // dbg!(&vec);
+            if let Some((r, o, t)) = reserve
+                .iter_mut()
+                .find(|(_, o, t)| *o == o_sel && *t == t_sel)
+            {
+                // if r_sel.quantity > 0 {
+                r_sel.quantity -= 1;
+
+                // dbg!(r_sel.quantity, r_sel, o_sel, t_sel);
+                // decrement reserve
+                pcs.push((to_position, o_sel, Rank::Regular, t_sel));
+
+                *r = r_sel;
+                // };
+            } else {
+                panic!();
+            }
         }
     }
 }
@@ -323,6 +347,11 @@ fn available_squares_iter_parent(
     //     .copied()
     //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
     // for each naive square, create a new board where those pieces are moved, then check if the king is not under check
+    // dbg!(
+    //     "start",
+    //     available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone()),
+    //     "end"
+    // );
     available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone())
         .into_iter()
         .filter(|p| {
@@ -331,7 +360,9 @@ fn available_squares_iter_parent(
             //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
             //     .copied()
             //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
+            // dbg!(p);
             let (mut reserve, mut pcs, squares) = (reserve.clone(), pcs.clone(), squares.clone());
+            // dbg!(&reserve);
             move_to_position(sel_pc, *p, &mut reserve, &mut pcs, squares.clone());
             // check if the kingpiece of the owner of `sel_pc` (which is now invalidated btw) is under check
             // find king
@@ -491,8 +522,8 @@ fn available_squares_iter(
         }
         XSelectedPiece::Reserve {
             r: r_sel,
-            t: t_sel,
             o: o_sel,
+            t: t_sel,
         } => {
             // two ways we can go about this
             //
@@ -576,7 +607,7 @@ fn available_square_system(
         Query<(Entity, &mut Sprite, &Position), With<Square>>,
     )>,
     piece_query: Query<(&Position, &Player, &Rank, &PieceType), With<Piece>>,
-    reserve_q: Query<(&Reserve, &Player, &PieceType), With<Piece>>,
+    reserve_q: Query<(&Reserve, &Player, &PieceType)>,
     colors: Res<Colors>,
     sel_pc_q: Query<(Entity, &Player, &Rank, &PieceType), With<SelectedPiece>>,
     pos_q: Query<&Position, With<SelectedPiece>>,
@@ -629,6 +660,7 @@ fn available_square_system(
                     .map(|(p, o, r, t)| (*p, *o, *r, *t))
                     .collect();
 
+                // dbg!("123123123123123", &reserve);
                 available_squares_iter_parent(sel_pc, reserve, pcs, squares)
             } else {
                 unreachable!();
@@ -683,3 +715,162 @@ fn detect_removals(
 // 1. Take in a vector of pieces and a vector of reserves, instead of querying things
 // 2. Needs to return an iterator (or vector, or whatever) of available pieces instead of actually mutating things
 // We 100 % need to make this a recursive function, since because of the dynamicity of shogi, there's an untold number of moves that can be made with the reserve
+
+/// Function that checks if game is won or not. If the current player's king is in check, checks if the player has any possible moves to get them out of check. If not, lets the other player win
+/// Feels like this function can recurse...
+fn check_win_system(
+    mut ev_done: EventReader<DoneEvent>,
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    colors: Res<Colors>,
+    pcs_q: Query<(&Position, &Player, &Rank, &PieceType), With<Piece>>,
+    res_q: Query<(&Reserve, &Player, &PieceType)>,
+    squares: Query<&Position, With<Square>>,
+    turn: Res<Turn>,
+) {
+    for e in ev_done.iter() {
+        // query for the king of the current player
+        if let Some((&p, &o, &r, &t)) = pcs_q
+            .iter()
+            .find(|&(_, o, _, t)| *o == turn.player && *t == PieceType::King)
+        {
+            let king_pc = XSelectedPiece::Board { p, o, r, t };
+            // check if the king is in check
+            let pcs: Vec<(Position, Player, Rank, PieceType)> =
+                pcs_q.iter().map(|(p, o, r, t)| (*p, *o, *r, *t)).collect();
+
+            let reserve: Vec<(Reserve, Player, PieceType)> =
+                res_q.iter().map(|(r, o, t)| (*r, *o, *t)).collect();
+
+            let squares: Vec<Position> = squares.iter().copied().collect();
+            if is_in_check(king_pc, reserve.clone(), pcs.clone(), squares.clone()) {
+                // dbg!("king is in check");
+                // check if there is a single move the player can make to get themselves out of the situation
+                if !pcs
+                    .iter()
+                    .filter(|&&(_, o, _, _)| o == turn.player)
+                    .any(|&(p, o, r, t)| {
+                        let sel_pc = XSelectedPiece::Board { p, o, r, t };
+
+                        available_squares_iter(
+                            sel_pc,
+                            reserve.clone(),
+                            pcs.clone(),
+                            squares.clone(),
+                        )
+                        .iter()
+                        .any(|&p| {
+                            let mut pcs = pcs.clone();
+                            let mut reserve = reserve.clone();
+                            let squares = squares.clone();
+
+                            dbg!("1231231313123123");
+                            move_to_position(sel_pc, p, &mut reserve, &mut pcs, squares.clone());
+
+                            // find king piece again
+                            let king_pc = if let Some(&(p, o, r, t)) = pcs
+                                .iter()
+                                .find(|&&(_, o, _, t)| o == turn.player && t == PieceType::King)
+                            {
+                                XSelectedPiece::Board { p, o, r, t }
+                            } else {
+                                unreachable!()
+                            };
+
+                            !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares)
+                        })
+                    })
+                    && !reserve
+                        .iter()
+                        .filter(|&&(r, o, _)| o == turn.player && r.quantity > 0)
+                        .any(|&(r, o, t)| {
+                            dbg!("hello ");
+                            let sel_pc = XSelectedPiece::Reserve { r, o, t };
+
+                            available_squares_iter(
+                                sel_pc,
+                                reserve.clone(),
+                                pcs.clone(),
+                                squares.clone(),
+                            )
+                            .iter()
+                            .any(|&p| {
+                                let mut pcs = pcs.clone();
+                                let mut reserve = reserve.clone();
+                                let squares = squares.clone();
+
+                                dbg!("123123123");
+                                move_to_position(
+                                    sel_pc,
+                                    p,
+                                    &mut reserve,
+                                    &mut pcs,
+                                    squares.clone(),
+                                );
+
+                                // find king piece again
+                                let king_pc = if let Some(&(p, o, r, t)) = pcs
+                                    .iter()
+                                    .find(|&&(_, o, _, t)| o == turn.player && t == PieceType::King)
+                                {
+                                    XSelectedPiece::Board { p, o, r, t }
+                                } else {
+                                    unreachable!()
+                                };
+
+                                !is_in_check(king_pc, reserve.clone(), pcs.clone(), squares)
+                            })
+                        })
+                // also add check for things in bench
+                {
+                    // iterate over every single piece here and make it all black or something
+                    let font = asset_server.load("yujiboku.ttf");
+                    let text_style = TextStyle {
+                        font,
+                        font_size: 100.0,
+                        color: colors.purple,
+                    };
+                    let text_alignment_center = TextAlignment {
+                        vertical: VerticalAlign::Center,
+                        horizontal: HorizontalAlign::Center,
+                    };
+                    let box_size = Size::new(400.0, 400.0);
+
+                    commands.spawn_bundle(Text2dBundle {
+                        text: Text::with_section(
+                            match turn.player {
+                                Player::Residing => {
+                                    "challenging player lost, better luck next time"
+                                }
+                                Player::Challenging => {
+                                    "residing player lost, oh how the might have fallen"
+                                }
+                            },
+                            text_style.clone(),
+                            text_alignment_center,
+                        ),
+                        text_2d_bounds: Text2dBounds {
+                            // Wrap text in the rectangle
+                            size: box_size,
+                        },
+                        // We align text to the top-left, so this transform is the top-left corner of our text. The
+                        // box is centered at box_position, so it is necessary to move by half of the box size to
+                        // keep the text in the box.
+                        transform: Transform {
+                            translation: match turn.player {
+                                Player::Challenging => Vec3::new(0.0, 2.0, 5.0),
+                                Player::Residing => Vec3::new(0.0, -2.0, 5.0),
+                            },
+                            // rotation: match turn.player {
+                            //     Player::Challenging => Quat::from_rotation_z(0.),
+                            //     Player::Residing => Quat::from_rotation_z(PI),
+                            // },
+                            ..default() // scale: todo!(),
+                        },
+                        ..default()
+                    });
+                }
+            }
+        }
+    }
+}
