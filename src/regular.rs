@@ -172,9 +172,9 @@ fn reset_square_system(
     }
 }
 
-// ECS is so fucking useful by the way
 // Is there anyway we can do this without making a struct like this?
 
+#[derive(Debug, Clone, Copy)]
 enum XSelectedPiece {
     Board {
         p: Position,
@@ -189,10 +189,93 @@ enum XSelectedPiece {
     },
 }
 
+fn is_in_check(
+    sel_pc: XSelectedPiece,
+    _reserve: Vec<(Reserve, Player, PieceType)>,
+    pcs: Vec<(Position, Player, Rank, PieceType)>,
+    squares: Vec<Position>,
+) -> bool {
+    if let XSelectedPiece::Board {
+        p: p_sel,
+        o: o_sel,
+        r: r_sel,
+        t: t_sel,
+    } = sel_pc
+    {
+        // run available squares algorithm
+        // the problem is this function does not even require the reserve
+        // vector, but available square does, so we're going to have to use it
+
+        // find the available squares of every piece that is not the same as the
+        // selected piece
+
+        pcs.iter()
+            .filter(|&&(_, o, _, _)| o != o_sel)
+            // who cares about 4 clones? not me
+            .flat_map(|_| {
+                available_squares_iter(sel_pc, _reserve.clone(), pcs.clone(), squares.clone())
+                    .into_iter()
+            })
+            .any(|p| p == p_sel)
+    } else {
+        unreachable!();
+    }
+}
+
+// literal clone of the version that mutates. I don't like ecs
+fn move_to_position(
+    sel_pc: XSelectedPiece,
+    // can't actually do a simple Position, because we chose to use separate
+    // arrays for reserve and pcs. So we're gonna use another piece as the to
+    // position, and just filter it. Very efficient, I know
+    to_position: Position,
+    reserve: &mut [(Reserve, Player, PieceType)],
+    pcs: &mut [(Position, Player, Rank, PieceType)],
+    // realistically squares should be a hashset of position...
+    squares: Vec<Position>,
+) {
+    match sel_pc {
+        XSelectedPiece::Board {
+            p: p_sel,
+            o: o_sel,
+            r: r_sel,
+            t: t_sel,
+        } => {
+
+        }
+        XSelectedPiece::Reserve {
+            r: r_sel,
+            o: o_sel,
+            t: t_sel,
+        } => {
+
+        }
+    }
+}
+
+fn available_squares_iter_parent(
+    sel_pc: XSelectedPiece,
+    reserve: Vec<(Reserve, Player, PieceType)>,
+    pcs: Vec<(Position, Player, Rank, PieceType)>,
+    squares: Vec<Position>,
+) -> Vec<Position> {
+    // for each naive square, create a new board where those pieces are moved, then check if the king is not under check
+    available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone())
+        .into_iter()
+        .map(|p| { 
+            let (mut reserve, mut pcs, squares) = (reserve.clone(), pcs.clone(), squares.clone());
+            move_to_position(sel_pc, p, &mut reserve, &mut pcs, squares);
+        });
+    
+    todo!()
+}
+
+// returns the valid available moves for a piece, given a board with all the pieces and a piece
+// if we choose to use the recursion method, how do we know when to stop recursing? A move is only valid if after the selected piece is moved to a square, the king is no longer in check.
 fn available_squares_iter(
     sel_pc: XSelectedPiece,
-    reserve: &[(&Reserve, &Player, &PieceType)],
-    pcs: &[(&Position, &Player, &Rank, &PieceType)],
+    reserve: Vec<(Reserve, Player, PieceType)>,
+    pcs: Vec<(Position, Player, Rank, PieceType)>,
     squares: Vec<Position>,
 ) -> Vec<Position> {
     match sel_pc {
@@ -205,17 +288,17 @@ fn available_squares_iter(
             // ignore self pieces
             let pcs_set: HashSet<Position> = pcs
                 .iter()
-                .filter(|(_, o, _, _)| **o == o_sel)
-                .map(|(p, _, _, _)| **p)
+                .filter(|&&(_, o, _, _)| o == o_sel)
+                .map(|&(p, _, _, _)| p)
                 .collect();
 
             squares
-                .iter()
-                .filter(|p| {
+                .into_iter()
+                .filter(|&p| {
                     // remove the possibility of going to squares that are already owned
-                    **p != p_sel && !pcs_set.contains(p)
+                    p != p_sel && !pcs_set.contains(&p)
                 })
-                .filter(|to_pos| {
+                .filter(|&to_pos| {
                     let (dy, dx) = (
                         to_pos.y as i32 - p_sel.y as i32,
                         to_pos.x as i32 - p_sel.x as i32,
@@ -260,24 +343,28 @@ fn available_squares_iter(
                                     .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
                             }
                             // add corner squares
-                            PieceType::Bishop => dx == dy || -dx == dy || {
-                                let dxdy = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                            PieceType::Bishop => {
+                                dx == dy || -dx == dy || {
+                                    let dxdy = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-                                dxdy.iter()
-                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
-                            },
-                            PieceType::Rook => dx == 0 || dy == 0 || {
-                                let dxdy = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+                                    dxdy.iter()
+                                        .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                                }
+                            }
+                            PieceType::Rook => {
+                                dx == 0 || dy == 0 || {
+                                    let dxdy = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 
-                                dxdy.iter()
-                                    .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
-                            },
+                                    dxdy.iter()
+                                        .any(|&[ddx, ddy]| ddx == dx && ddy * o_sel as i32 == dy)
+                                }
+                            }
                         },
                     };
 
-                    let pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
-                        pcs.iter().map(|tup| *tup).collect();
-                    matches && is_path_clear(&p_sel, &to_pos, &pcs[..])
+                    let pcs: Vec<(Position, Player, Rank, PieceType)> =
+                        pcs.iter().copied().collect();
+                    matches && is_path_clear(p_sel, to_pos, pcs)
                     // {
                     // do this later, in the function with the query where we're
                     // calling this
@@ -285,8 +372,19 @@ fn available_squares_iter(
                     // sprite.color = colors.green;
                     // }
                 })
-                .map(|p| *p)
                 .collect()
+            // .map(|p| *p)
+            // for each available square of the piece, move it, then check if the king is still in check
+            // .filter(|p_available| {
+            //     // move the selected piece to the square
+            //     // we *do not* have to promote the square at this point, because the rank of the piece shouldn't affect if it blocks any checks or not. We *DO* have to take pieces in this phase, though. I think functions in ECS by default should definitely accept normal Rust constructs. ECS is only a way to init into these functions easier
+            //     let selected_piece = XSelectedPiece::Board {
+            //         p: p_available,
+            //         o,
+            //         r,
+            //         t
+            //     };
+            // })
         }
         XSelectedPiece::Reserve {
             r: r_sel,
@@ -308,17 +406,17 @@ fn available_squares_iter(
 
             // create list of squares which are not occupied by pieces
             let free_squares: Vec<Position> = {
-                let pcs: HashSet<Position> = pcs.iter().map(|(p, o, r, t)| **p).collect();
-                squares.into_iter().filter(|p| !pcs.contains(&p)).collect()
+                let pcs: HashSet<Position> = pcs.iter().map(|(p, o, r, t)| *p).collect();
+                squares.into_iter().filter(|p| !pcs.contains(p)).collect()
             };
 
             // completely ignore all pieces
             match t_sel {
                 PieceType::Pawn => {
                     let player_pawns: HashSet<usize> = pcs
-                        .iter()
-                        .filter(|(_, o, r, t)| {
-                            **o == o_sel && **r == Rank::Regular && **t == PieceType::Pawn
+                        .into_iter()
+                        .filter(|&(_, o, r, t)| {
+                            o == o_sel && r == Rank::Regular && t == PieceType::Pawn
                         })
                         .map(|(p, _, _, _)| p.x)
                         .collect();
@@ -390,7 +488,7 @@ fn available_square_system(
             // never fails, since we checked earlier
             let (e, o, r, t) = sel_pc_q.single();
 
-            let squares: Vec<Position> = square_query.p0().iter().map(|p| *p).collect();
+            let squares: Vec<Position> = square_query.p0().iter().copied().collect();
 
             let available_squares = if let Ok(p) = pos_q.get(e) {
                 let sel_pc = XSelectedPiece::Board {
@@ -399,24 +497,30 @@ fn available_square_system(
                     r: *r,
                     t: *t,
                 };
-                let reserve: Vec<(&Reserve, &Player, &PieceType)> = reserve_q.iter().collect();
-                let mut pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
-                    piece_query.iter().collect();
-                pcs.push((p, o, r, t));
+                let mut reserve: Vec<(Reserve, Player, PieceType)> =
+                    reserve_q.iter().map(|(r, o, t)| (*r, *o, *t)).collect();
+                let mut pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
+                    .iter()
+                    .map(|(p, o, r, t)| (*p, *o, *r, *t))
+                    .collect();
+                pcs.push((*p, *o, *r, *t));
 
-                available_squares_iter(sel_pc, &reserve, &pcs, squares)
+                available_squares_iter(sel_pc, reserve, pcs, squares)
             } else if let Ok(r) = res_q.get(e) {
                 let sel_pc = XSelectedPiece::Reserve {
                     r: *r,
                     o: *o,
                     t: *t,
                 };
-                let mut reserve: Vec<(&Reserve, &Player, &PieceType)> = reserve_q.iter().collect();
-                reserve.push((r, o, t));
-                let pcs: Vec<(&Position, &Player, &Rank, &PieceType)> =
-                    piece_query.iter().collect();
+                let mut reserve: Vec<(Reserve, Player, PieceType)> =
+                    reserve_q.iter().map(|(r, o, t)| (*r, *o, *t)).collect();
+                reserve.push((*r, *o, *t));
+                let mut pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
+                    .iter()
+                    .map(|(p, o, r, t)| (*p, *o, *r, *t))
+                    .collect();
 
-                available_squares_iter(sel_pc, &reserve, &pcs, squares)
+                available_squares_iter(sel_pc, reserve, pcs, squares)
             } else {
                 unreachable!();
             };

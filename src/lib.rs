@@ -111,7 +111,7 @@ impl From<char> for PieceType {
     }
 }
 
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Component, Clone, Copy, PartialEq, Eq)]
 pub enum Rank {
     Regular,
     Promoted,
@@ -187,7 +187,7 @@ pub fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
     }
 }
 
-pub fn is_path_clear(start: &Position, end: &Position, pieces: &[(&Position, &Player, &Rank, &PieceType)]) -> bool {
+pub fn is_path_clear(start: Position, end: Position, pieces: Vec<(Position, Player, Rank, PieceType)>) -> bool {
     let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
         let dy = endy as f32 - starty as f32;
         let dx = endx as f32 - startx as f32;
