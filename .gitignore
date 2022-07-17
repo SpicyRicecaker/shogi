@@ -3,3 +3,5 @@
 # fleet configurations
 /fleet.toml
 /.cargo
+
+.DS_Store

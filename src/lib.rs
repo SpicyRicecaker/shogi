@@ -1,3 +1,8 @@
+#![allow(
+  clippy::too_many_arguments,
+  clippy::type_complexity,
+)]
+
 use bevy::math::const_vec3;
 use bevy::prelude::*;
 
@@ -5,16 +10,41 @@ pub const SQUARE_LENGTH: f32 = 50.0;
 pub const SQUARE_SIZE: Vec3 = const_vec3!([50.0, 50.0, 0.0]);
 pub const SQUARE_BORDER: f32 = 8.0;
 
-pub const BOARD_X_OFFSET: f32 = -250.0;
-pub const BOARD_Y_OFFSET: f32 = -200.0;
-pub const RESERVE_X_OFFSET: f32 = 50.0;
-
+pub mod bindgen;
 pub mod debug;
 pub mod mouse;
-pub mod reserve;
 pub mod regular;
+pub mod reserve;
 #[cfg(test)]
 pub mod tests;
+
+pub struct Board {
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub x_reserve_offset: f32,
+}
+
+impl FromWorld for Board {
+    fn from_world(world: &mut World) -> Self {
+        let windows = world.get_resource::<Windows>().unwrap();
+        let window = windows.get_primary().unwrap();
+
+        // square_length / 2. because bevy spawns shapes at the center for no reason
+        let x_offset =
+            (window.width() - SQUARE_LENGTH * 9.) / 2. - window.width() / 2. + SQUARE_LENGTH / 2.;
+
+        let y_offset =
+            (window.height() - SQUARE_LENGTH * 9.) / 2. - window.height() / 2. + SQUARE_LENGTH / 2.;
+
+        let x_reserve_offset = x_offset + SQUARE_LENGTH;
+
+        Board {
+            x_offset,
+            y_offset,
+            x_reserve_offset,
+        }
+    }
+}
 
 pub struct Colors {
     pub dark: Color,
@@ -138,16 +168,16 @@ pub enum SelectedPieceEvent {
     None,
 }
 
-pub fn translate_transform(x: f32, y: f32, owner: &Player) -> Vec3 {
+pub fn translate_transform(x: f32, y: f32, x_offset: f32, y_offset: f32, owner: &Player) -> Vec3 {
     match owner {
         Player::Challenging => Vec3::new(
-            x * SQUARE_LENGTH + BOARD_X_OFFSET,
-            y * SQUARE_LENGTH + BOARD_Y_OFFSET,
+            x * SQUARE_LENGTH + x_offset,
+            y * SQUARE_LENGTH + y_offset,
             2.0,
         ),
         Player::Residing => Vec3::new(
-            x * SQUARE_LENGTH + BOARD_X_OFFSET,
-            y * SQUARE_LENGTH + BOARD_Y_OFFSET,
+            x * SQUARE_LENGTH + x_offset,
+            y * SQUARE_LENGTH + y_offset,
             2.0,
         ),
     }
@@ -187,7 +217,11 @@ pub fn get_kanji(piece_type: PieceType, rank: Rank, owner: Player) -> char {
     }
 }
 
-pub fn is_path_clear(start: Position, end: Position, pieces: Vec<(Position, Player, Rank, PieceType)>) -> bool {
+pub fn is_path_clear(
+    start: Position,
+    end: Position,
+    pieces: &[(Position, Player, Rank, PieceType)],
+) -> bool {
     let polar_maker = |startx: f32, starty: f32, endx: f32, endy: f32| -> (f32, f32) {
         let dy = endy as f32 - starty as f32;
         let dx = endx as f32 - startx as f32;
@@ -197,8 +231,6 @@ pub fn is_path_clear(start: Position, end: Position, pieces: Vec<(Position, Play
 
     let (trajectory_angle, trajectory_magnitude) =
         polar_maker(start.x as f32, start.y as f32, end.x as f32, end.y as f32);
-
-    // dbg!("runinng");
 
     !pieces
         .iter()
@@ -211,9 +243,6 @@ pub fn is_path_clear(start: Position, end: Position, pieces: Vec<(Position, Play
                 piece.x as f32,
                 piece.y as f32,
             );
-
-            // dbg!(this_trajectory_angle, trajectory_angle);
-            // dbg!(this_trajectory_magnitude, trajectory_magnitude);
 
             this_trajectory_angle == trajectory_angle
                 && this_trajectory_magnitude < trajectory_magnitude

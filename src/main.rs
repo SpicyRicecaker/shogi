@@ -1,3 +1,5 @@
+#![deny(clippy::all)]
+
 use bevy::prelude::*;
 
 use shogi_rs::{
@@ -5,12 +7,14 @@ use shogi_rs::{
 };
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
+    let mut app = App::new();
+
+    app.add_plugins(DefaultPlugins)
         .insert_resource(ClearColor(Color::hex("282828").unwrap()))
         .add_startup_system(|mut commands: Commands| {
             commands.spawn_bundle(OrthographicCameraBundle::new_2d());
         })
+        .init_resource::<Board>()
         .add_plugin(DebugPlugin)
         // turns mouse clicks into world coordinates, then emits an event
         .add_plugin(MousePlugin)
@@ -21,6 +25,11 @@ fn main() {
         .insert_resource(Turn {
             player: Player::Challenging,
         })
-        .insert_resource(Colors::default())
-        .run();
+        .init_resource::<Colors>();
+
+    // resize canvas thingy
+    #[cfg(target_arch = "wasm32")]
+    app.add_plugin(shogi_rs::bindgen::Plugin);
+
+    app.run();
 }

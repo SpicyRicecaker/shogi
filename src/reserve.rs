@@ -3,7 +3,6 @@ use std::f32::consts::PI;
 use bevy::{prelude::*, text::Text2dBounds};
 
 use crate::mouse::*;
-use crate::regular::DoneEvent;
 use crate::*;
 
 pub struct ReservePlugin;
@@ -15,7 +14,12 @@ impl Plugin for ReservePlugin {
     }
 }
 
-fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<AssetServer>) {
+fn spawn_reserve(
+    mut commands: Commands,
+    colors: Res<Colors>,
+    asset_server: Res<AssetServer>,
+    board: Res<Board>,
+) {
     let font = asset_server.load("yujiboku.ttf");
 
     let box_size = Size::new(48.0, 48.0);
@@ -48,8 +52,8 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                     transform: Transform {
                         scale: SQUARE_SIZE,
                         translation: Vec3::new(
-                            RESERVE_X_OFFSET + SQUARE_LENGTH * idx as f32 + BOARD_X_OFFSET,
-                            start_y + BOARD_Y_OFFSET,
+                            board.x_reserve_offset + SQUARE_LENGTH * idx as f32,
+                            start_y + board.y_offset,
                             0.,
                         ),
                         ..Default::default()
@@ -79,8 +83,8 @@ fn spawn_reserve(mut commands: Commands, colors: Res<Colors>, asset_server: Res<
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            RESERVE_X_OFFSET + idx as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
-                            start_y + BOARD_Y_OFFSET,
+                            board.x_reserve_offset + idx as f32 * SQUARE_LENGTH,
+                            start_y + board.y_offset,
                             1.0,
                         ),
                         ..Default::default()

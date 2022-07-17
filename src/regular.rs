@@ -23,22 +23,19 @@ impl Plugin for RegularPlugin {
 }
 
 // separating squares from pieces is genius, because then we can actually give the piece a unique sprite
-fn spawn_squares(mut commands: Commands, colors: Res<Colors>) {
+fn spawn_squares(mut commands: Commands, colors: Res<Colors>, board: Res<Board>) {
     for i in 0..9 {
         for j in 0..9 {
             commands
                 .spawn_bundle(SpriteBundle {
                     sprite: Sprite {
                         color: colors.light,
-                        // custom_size: Some(Vec2::new(
-                        //     square_length - square_border,
-                        // )),
                         ..Default::default()
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            i as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
-                            j as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
+                            i as f32 * SQUARE_LENGTH + board.x_offset,
+                            j as f32 * SQUARE_LENGTH + board.y_offset,
                             0.0,
                         ),
                         scale: SQUARE_SIZE,
@@ -52,7 +49,12 @@ fn spawn_squares(mut commands: Commands, colors: Res<Colors>) {
     }
 }
 
-fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<AssetServer>) {
+fn spawn_pieces(
+    mut commands: Commands,
+    colors: Res<Colors>,
+    asset_server: Res<AssetServer>,
+    board: Res<Board>,
+) {
     let font = asset_server.load("yujiboku.ttf");
     let text_style = TextStyle {
         font,
@@ -68,27 +70,16 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
 
     let box_size = Size::new(48.0, 48.0);
 
-    // let pieces = r##"
-    // lnsgkgsnl
-    // .r.....b.
-    // ppppppppp
-    // .........
-    // .........
-    // .........
-    // ppppppppp
-    // .b.....r.
-    // lnsgkgsnl
-    // "##;
     let pieces = r##"
-    r...k....
+    lnsgkgsnl
+    .r.....b.
+    ppppppppp
     .........
     .........
     .........
-    .........
-    .........
-    p........
-    r........
-    r...k...r
+    ppppppppp
+    .b.....r.
+    lnsgkgsnl
     "##;
 
     for (y, line) in pieces.trim().lines().rev().enumerate() {
@@ -116,8 +107,8 @@ fn spawn_pieces(mut commands: Commands, colors: Res<Colors>, asset_server: Res<A
                     },
                     transform: Transform {
                         translation: Vec3::new(
-                            x as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
-                            y as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
+                            x as f32 * SQUARE_LENGTH + board.x_offset,
+                            y as f32 * SQUARE_LENGTH + board.y_offset,
                             1.0,
                         ),
                         ..Default::default()
@@ -168,7 +159,6 @@ fn reset_square_system(
     colors: Res<Colors>,
 ) {
     for _ in ev_selected_piece.iter() {
-        // dbg!("ran reset square system");
         for (entity, mut sprite) in square_query.iter_mut() {
             sprite.color = colors.light;
             commands.entity(entity).remove::<Available>();
@@ -202,8 +192,9 @@ fn is_in_check(
     if let XSelectedPiece::Board {
         p: p_sel,
         o: o_sel,
-        r: r_sel,
-        t: t_sel,
+        // r: r_sel,
+        // t: t_sel,
+        ..
     } = sel_pc
     {
         // run available squares algorithm
@@ -218,7 +209,7 @@ fn is_in_check(
             // who cares about 4 clones? not me
             .flat_map(|&(p, o, r, t)| {
                 let curr_sel_pc = XSelectedPiece::Board { p, o, r, t };
-                available_squares_iter(curr_sel_pc, _reserve.clone(), pcs.clone(), squares.clone())
+                available_squares_iter(curr_sel_pc, pcs.clone(), squares.clone())
                     .into_iter()
             })
             .any(|p| p == p_sel)
@@ -234,10 +225,10 @@ fn move_to_position(
     // arrays for reserve and pcs. So we're gonna use another piece as the to
     // position, and just filter it. Very efficient, I know
     to_position: Position,
-    reserve: &mut Vec<(Reserve, Player, PieceType)>,
+    reserve: &mut [(Reserve, Player, PieceType)],
     pcs: &mut Vec<(Position, Player, Rank, PieceType)>,
     // realistically squares should be a hashset of position...
-    squares: Vec<Position>,
+    // squares: Vec<Position>,
 ) {
     match sel_pc {
         XSelectedPiece::Board {
@@ -248,10 +239,10 @@ fn move_to_position(
         } => {
             let mut i = None;
             // if the position we're moving to is occupied, take the piece
-            if let Some((idx, &(p, o, r, t))) = pcs
+            if let Some((idx, &(_, _, _, t))) = pcs
                 .iter()
                 .enumerate()
-                .find(|(idx, &(p, _, _, _))| p == to_position)
+                .find(|(_, &(p, _, _, _))| p == to_position)
             {
                 // find the piece in reserve which matches the taken piece and increment it
                 // double `&&` might error here
@@ -283,9 +274,6 @@ fn move_to_position(
                 r_sel = Rank::Promoted;
             }
 
-            // p_sel.x = x;
-            // p_sel.y = y;
-
             // add the selected piece to the board (VERY BAD HACK, BECAUSE
             // LITERALLY EVERY OTHER FUNCTION ASSUMES THAT THE SELECTED PIECE IS
             // NOT ACTUALLY PART OF THE BOARD SO CARE)
@@ -306,7 +294,7 @@ fn move_to_position(
             o: o_sel,
             t: t_sel,
         } => {
-            if let Some((r, o, t)) = reserve
+            if let Some((r, _, _)) = reserve
                 .iter_mut()
                 .find(|(r, o, t)| r.quantity > 0 && *o == o_sel && *t == t_sel)
             {
@@ -332,29 +320,11 @@ fn available_squares_iter_parent(
         XSelectedPiece::Board { o, .. } => o,
         XSelectedPiece::Reserve { o, .. } => o,
     };
-    // dbg!("123123123", pcs
-    //     .iter()
-    //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
-    //     .copied()
-    //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
-    // for each naive square, create a new board where those pieces are moved, then check if the king is not under check
-    // dbg!(
-    //     "start",
-    //     available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone()),
-    //     "end"
-    // );
-    available_squares_iter(sel_pc, reserve.clone(), pcs.clone(), squares.clone())
+    available_squares_iter(sel_pc, pcs.clone(), squares.clone())
         .into_iter()
         .filter(|p| {
-            // dbg!(pcs
-            //     .iter()
-            //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
-            //     .copied()
-            //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
-            // dbg!(p);
             let (mut reserve, mut pcs, squares) = (reserve.clone(), pcs.clone(), squares.clone());
-            // dbg!(&reserve);
-            move_to_position(sel_pc, *p, &mut reserve, &mut pcs, squares.clone());
+            move_to_position(sel_pc, *p, &mut reserve, &mut pcs);
             // check if the kingpiece of the owner of `sel_pc` (which is now invalidated btw) is under check
             // find king
             let king_pc = XSelectedPiece::Board {
@@ -369,27 +339,6 @@ fn available_squares_iter_parent(
                 t: PieceType::King,
             };
 
-            // dbg!(pcs
-            //     .iter()
-            //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
-            //     .copied()
-            //     .collect::<Vec<(Position, Player, Rank, PieceType)>>());
-
-            // if pcs
-            //     .iter()
-            //     .filter(|&(_, o, _, t)| *o == o_sel && *t == PieceType::King)
-            //     .copied()
-            //     .collect::<Vec<(Position, Player, Rank, PieceType)>>().len() > 1 {
-            //         println!("12312312313123p12312312313123123123123131231231231231312312312312313123");
-            //     }
-            // let idx = pcs
-            //         .iter()
-            //         .enumerate()
-            //         .find(|(i, &(_, o, _, t))| o == o_sel && t == PieceType::King)
-            //         .map(|(i, _)| i)
-            //         .unwrap();
-            // pcs.remove(idx);
-
             !is_in_check(king_pc, reserve, pcs, squares)
         })
         .collect()
@@ -399,7 +348,7 @@ fn available_squares_iter_parent(
 // if we choose to use the recursion method, how do we know when to stop recursing? A move is only valid if after the selected piece is moved to a square, the king is no longer in check.
 fn available_squares_iter(
     sel_pc: XSelectedPiece,
-    reserve: Vec<(Reserve, Player, PieceType)>,
+    // reserve: Vec<(Reserve, Player, PieceType)>,
     pcs: Vec<(Position, Player, Rank, PieceType)>,
     squares: Vec<Position>,
 ) -> Vec<Position> {
@@ -487,34 +436,18 @@ fn available_squares_iter(
                         },
                     };
 
-                    let pcs: Vec<(Position, Player, Rank, PieceType)> =
-                        pcs.iter().copied().collect();
-                    matches && is_path_clear(p_sel, to_pos, pcs)
-                    // {
-                    // do this later, in the function with the query where we're
-                    // calling this
-                    // commands.entity(entity).insert(Available);
-                    // sprite.color = colors.green;
-                    // }
+                    matches && is_path_clear(p_sel, to_pos, &pcs)
                 })
                 .collect()
-            // .map(|p| *p)
             // for each available square of the piece, move it, then check if the king is still in check
-            // .filter(|p_available| {
             //     // move the selected piece to the square
             //     // we *do not* have to promote the square at this point, because the rank of the piece shouldn't affect if it blocks any checks or not. We *DO* have to take pieces in this phase, though. I think functions in ECS by default should definitely accept normal Rust constructs. ECS is only a way to init into these functions easier
-            //     let selected_piece = XSelectedPiece::Board {
-            //         p: p_available,
-            //         o,
-            //         r,
-            //         t
-            //     };
-            // })
         }
         XSelectedPiece::Reserve {
-            r: r_sel,
+            // r: r_sel,
             o: o_sel,
             t: t_sel,
+            ..
         } => {
             // two ways we can go about this
             //
@@ -531,7 +464,7 @@ fn available_squares_iter(
 
             // create list of squares which are not occupied by pieces
             let free_squares: Vec<Position> = {
-                let pcs: HashSet<Position> = pcs.iter().map(|(p, o, r, t)| *p).collect();
+                let pcs: HashSet<Position> = pcs.iter().map(|(p, _, _, _)| *p).collect();
                 squares.into_iter().filter(|p| !pcs.contains(p)).collect()
             };
 
@@ -603,18 +536,13 @@ fn available_square_system(
     sel_pc_q: Query<(Entity, &Player, &Rank, &PieceType), With<SelectedPiece>>,
     pos_q: Query<&Position, With<SelectedPiece>>,
     res_q: Query<&Reserve, With<SelectedPiece>>,
-    turn: Res<Turn>,
+    // turn: Res<Turn>,
 ) {
     ev_selected_piece
         .iter()
         // if there is no selected piece don't populate anything
         .filter(|e| **e != SelectedPieceEvent::None)
-        .for_each(|e| {
-            // dbg!("hello world kappa", piece_query
-            //     .iter()
-            //     .filter(|&(_, o, _, t)| *o == turn.player && *t == PieceType::King)
-            //     .collect::<Vec<(&Position, &Player, &Rank, &PieceType)>>());
-
+        .for_each(|_| {
             // never fails, since we checked earlier
             let (e, o, r, t) = sel_pc_q.single();
 
@@ -627,13 +555,12 @@ fn available_square_system(
                     r: *r,
                     t: *t,
                 };
-                let mut reserve: Vec<(Reserve, Player, PieceType)> =
+                let reserve: Vec<(Reserve, Player, PieceType)> =
                     reserve_q.iter().map(|(r, o, t)| (*r, *o, *t)).collect();
-                let mut pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
+                let pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
                     .iter()
                     .map(|(p, o, r, t)| (*p, *o, *r, *t))
                     .collect();
-                // pcs.push((*p, *o, *r, *t));
 
                 // pcs includes the selected_piece by default, even though you'd think it wouldn't
                 available_squares_iter_parent(sel_pc, reserve, pcs, squares)
@@ -643,44 +570,29 @@ fn available_square_system(
                     o: *o,
                     t: *t,
                 };
-                let mut reserve: Vec<(Reserve, Player, PieceType)> =
+                let reserve: Vec<(Reserve, Player, PieceType)> =
                     reserve_q.iter().map(|(r, o, t)| (*r, *o, *t)).collect();
-                // reserve.push((*r, *o, *t));
-                let mut pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
+                let pcs: Vec<(Position, Player, Rank, PieceType)> = piece_query
                     .iter()
                     .map(|(p, o, r, t)| (*p, *o, *r, *t))
                     .collect();
 
-                // dbg!("123123123123123", &reserve);
                 available_squares_iter_parent(sel_pc, reserve, pcs, squares)
             } else {
                 unreachable!();
             };
 
-            if available_squares.is_empty() {
-                // // declare game state as won, exit process, probably
-                // // DEBUG
-                // println!(
-                //     "{:?} won, gg.",
-                //     match turn.player {
-                //         Player::Residing => "challenging",
-                //         Player::Challenging => "residing",
-                //     }
-                // );
-                // std::process::exit(0);
-            } else {
-                let pos_set: HashSet<Position> = available_squares.into_iter().collect();
+            let pos_set: HashSet<Position> = available_squares.into_iter().collect();
 
-                // match the squares with sprites against the hashmap we generate here
-                square_query
-                    .p1()
-                    .iter_mut()
-                    .filter(|(_, _, p)| pos_set.contains(p))
-                    .for_each(|(e, mut s, _)| {
-                        commands.entity(e).insert(Available);
-                        s.color = colors.green;
-                    });
-            }
+            // match the squares with sprites against the hashmap we generate here
+            square_query
+                .p1()
+                .iter_mut()
+                .filter(|(_, _, p)| pos_set.contains(p))
+                .for_each(|(e, mut s, _)| {
+                    commands.entity(e).insert(Available);
+                    s.color = colors.green;
+                });
         });
 }
 
@@ -690,7 +602,6 @@ fn detect_removals(
     colors: Res<Colors>,
 ) {
     for (entity, mut sprite) in removals.iter_mut() {
-        // dbg!("ran removal system");
         commands.entity(entity).remove::<NegativeSelectedPiece>();
         sprite.color = colors.dark;
     }
@@ -719,7 +630,7 @@ fn check_win_system(
     squares: Query<&Position, With<Square>>,
     turn: Res<Turn>,
 ) {
-    for e in ev_done.iter() {
+    for _ in ev_done.iter() {
         // query for the king of the current player
         if let Some((&p, &o, &r, &t)) = pcs_q
             .iter()
@@ -735,7 +646,6 @@ fn check_win_system(
 
             let squares: Vec<Position> = squares.iter().copied().collect();
             if is_in_check(king_pc, reserve.clone(), pcs.clone(), squares.clone()) {
-                // dbg!("king is in check");
                 // check if there is a single move the player can make to get themselves out of the situation
                 if !pcs
                     .iter()
@@ -745,7 +655,6 @@ fn check_win_system(
 
                         available_squares_iter(
                             sel_pc,
-                            reserve.clone(),
                             pcs.clone(),
                             squares.clone(),
                         )
@@ -755,8 +664,7 @@ fn check_win_system(
                             let mut reserve = reserve.clone();
                             let squares = squares.clone();
 
-                            // dbg!("1231231313123123");
-                            move_to_position(sel_pc, p, &mut reserve, &mut pcs, squares.clone());
+                            move_to_position(sel_pc, p, &mut reserve, &mut pcs);
 
                             // find king piece again
                             let king_pc = if let Some(&(p, o, r, t)) = pcs
@@ -773,7 +681,9 @@ fn check_win_system(
                             } else {
                                 None
                             }
-                        }).count() != 0
+                        })
+                        .count()
+                            != 0
                     })
                     && !reserve
                         .iter()
@@ -783,7 +693,6 @@ fn check_win_system(
 
                             available_squares_iter(
                                 sel_pc,
-                                reserve.clone(),
                                 pcs.clone(),
                                 squares.clone(),
                             )
@@ -793,14 +702,7 @@ fn check_win_system(
                                 let mut reserve = reserve.clone();
                                 let squares = squares.clone();
 
-                                // dbg!("123123123");
-                                move_to_position(
-                                    sel_pc,
-                                    p,
-                                    &mut reserve,
-                                    &mut pcs,
-                                    squares.clone(),
-                                );
+                                move_to_position(sel_pc, p, &mut reserve, &mut pcs);
 
                                 // find king piece again
                                 let king_pc = if let Some(&(p, o, r, t)) = pcs
@@ -817,7 +719,9 @@ fn check_win_system(
                                 } else {
                                     None
                                 }
-                            }).count() != 0
+                            })
+                            .count()
+                                != 0
                         })
                 // also add check for things in bench
                 {
@@ -859,11 +763,7 @@ fn check_win_system(
                                 Player::Challenging => Vec3::new(0.0, 2.0, 5.0),
                                 Player::Residing => Vec3::new(0.0, -2.0, 5.0),
                             },
-                            // rotation: match turn.player {
-                            //     Player::Challenging => Quat::from_rotation_z(0.),
-                            //     Player::Residing => Quat::from_rotation_z(PI),
-                            // },
-                            ..default() // scale: todo!(),
+                            ..default()
                         },
                         ..default()
                     });

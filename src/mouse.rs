@@ -36,12 +36,7 @@ pub struct ReserveClickEvent {
     pub owner: Player,
 }
 
-pub struct MoveEvent {
-    // player that moved the piece
-    player: Player,
-    // position piece was moved to
-    position: Position,
-}
+pub struct MoveEvent;
 
 pub struct TakeEvent {
     pub taker: Player,
@@ -49,14 +44,13 @@ pub struct TakeEvent {
 }
 
 // solution copied from https://bevy-cheatbook.github.io/cookbook/cursor2world.html?highlight=coordinate#convert-cursor-to-world-coordinates
-fn window_to_world(
+pub fn window_to_world(
     screen_position: Vec2,
-    window: &Window,
+    window_size: Vec2,
     camera: &Camera,
     camera_transform: &GlobalTransform,
 ) -> Vec2 {
     // get the size of the window
-    let window_size = Vec2::new(window.width() as f32, window.height() as f32);
 
     // convert screen position [0..resolution] to ndc [-1..1] (gpu coordinates)
     let ndc = (screen_position / window_size) * 2.0 - Vec2::ONE;
@@ -87,9 +81,9 @@ fn mouse_system(
 
     if let Some(position) = window.cursor_position() {
         let (camera, camera_transform) = camera.single();
-        let position = window_to_world(position, window, camera, camera_transform);
+        let window_size = Vec2::new(window.width() as f32, window.height() as f32);
+        let position = window_to_world(position, window_size, camera, camera_transform);
         if buttons.just_pressed(MouseButton::Left) {
-            // println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
@@ -102,25 +96,17 @@ fn mouse_system(
                 let x = position.x;
                 let y = position.y;
 
-                // dbg!(transform, square_position);
                 if x >= square_x - size
                     && x <= square_x + size
                     && y >= square_y - size
                     && y <= square_y + size
                 {
-                    // println!("square clicked!");
                     ev_click.send(ClickEvent {
                         position: *square_position,
                     });
-                    // DEBUG
-                    // println!("DBG: Square clicked at {:#?}", *square_position);
                     break;
                 }
-                // println!("{:#?}", transform.translation);
             }
-
-            // DEBUG
-            // println!("DBG: Square clicked at {:#?}", position);
         }
     }
 }
@@ -157,6 +143,7 @@ fn move_system(
     )>,
     colors: Res<Colors>,
     asset_server: Res<AssetServer>,
+    board: Res<Board>,
 ) {
     for e in ev_click.iter() {
         if set
@@ -238,8 +225,13 @@ fn move_system(
                     position.x = x;
                     position.y = y;
 
-                    transform.translation =
-                        translate_transform(position.x as f32, position.y as f32, player);
+                    transform.translation = translate_transform(
+                        position.x as f32,
+                        position.y as f32,
+                        board.x_offset,
+                        board.y_offset,
+                        player,
+                    );
                     sprite.color = colors.dark;
                 } else {
                     let mut reserve = res_q.get_mut(entity).unwrap();
@@ -259,9 +251,6 @@ fn move_system(
                     // decrement reserve
                     reserve.quantity -= 1;
                     if reserve.quantity == 0 {
-                        // dbg!(&entity, &transform, &player, &sprite, &piece_type);
-                        // sprite.color.set_a(0.2);
-                        // dbg!("updated", &sprite);
                         sprite.color = {
                             let mut dark = colors.dark;
                             dark.set_a(0.2);
@@ -291,8 +280,8 @@ fn move_system(
                             },
                             transform: Transform {
                                 translation: Vec3::new(
-                                    x as f32 * SQUARE_LENGTH + BOARD_X_OFFSET,
-                                    y as f32 * SQUARE_LENGTH + BOARD_Y_OFFSET,
+                                    x as f32 * SQUARE_LENGTH + board.x_offset,
+                                    y as f32 * SQUARE_LENGTH + board.y_offset,
                                     1.0,
                                 ),
                                 ..Default::default()
@@ -336,10 +325,7 @@ fn move_system(
                 }
 
                 commands.entity(entity).remove::<SelectedPiece>();
-                ev_move.send(MoveEvent {
-                    player: turn.player,
-                    position: e.position,
-                });
+                ev_move.send(MoveEvent);
                 turn.player = turn.player.swap();
             }
         }
@@ -354,10 +340,9 @@ fn cleanup_move_system(
     mut ev_win: EventWriter<DoneEvent>,
     mut commands: Commands,
     mut available_squares: Query<(Entity, &mut Sprite), With<Available>>,
-    mut selected_piece: Query<(Entity, &mut Sprite), (With<SelectedPiece>, Without<Available>)>,
     colors: Res<Colors>,
 ) {
-    for e in ev_move.iter() {
+    ev_move.iter().for_each(|_| {
         // if let Ok((entity, mut sprite)) = selected_piece.get_single_mut() {
         //     commands.entity(entity).remove::<SelectedPiece>();
         //     sprite.color = colors.dark;
@@ -367,7 +352,7 @@ fn cleanup_move_system(
             sprite.color = colors.light;
         }
         ev_win.send(DoneEvent);
-    }
+    });
 }
 
 fn square_system(
@@ -387,7 +372,6 @@ fn square_system(
             if position.x == e.position.x && position.y == e.position.y {
                 // Prevent other player from clicking.
                 // Turn off for debugging
-                // dbg!("turn player", &turn);
                 if *owner != turn.player {
                     break;
                 }
@@ -398,7 +382,6 @@ fn square_system(
                 if let Ok((old_selected_piece, old_selected_piece_position)) =
                     selected_piece.p0().get_single()
                 {
-                    // println!("old was a square");
                     let mut entity_command = commands.entity(old_selected_piece);
                     entity_command.remove::<SelectedPiece>();
                     entity_command.insert(NegativeSelectedPiece);
@@ -407,13 +390,10 @@ fn square_system(
                         commands.entity(entity).insert(SelectedPiece);
                         ev_selected_piece.send(SelectedPieceEvent::Change);
                         sprite.color = colors.blue;
-                        // dbg!("cool");
                     } else {
-                        // dbg!("nothing");
                         ev_selected_piece.send(SelectedPieceEvent::None);
                     }
-                } else if let Ok((old_sel_pc_e, reserve)) = selected_piece.p1().get_single() {
-                    // println!("old was a square");
+                } else if let Ok((old_sel_pc_e, _)) = selected_piece.p1().get_single() {
                     commands.entity(old_sel_pc_e).remove::<SelectedPiece>();
                     commands.entity(old_sel_pc_e).insert(NegativeSelectedPiece);
 
@@ -445,29 +425,26 @@ fn reserve_mouse_system(
 
     if let Some(position) = window.cursor_position() {
         let (camera, camera_transform) = camera.single();
-        let position = window_to_world(position, window, camera, camera_transform);
+        let window_size = Vec2::new(window.width() as f32, window.height() as f32);
+        let position = window_to_world(position, window_size, camera, camera_transform);
         if buttons.just_pressed(MouseButton::Left) {
-            // println!("mouse just got clicked at {:#?}", position);
             // try to match it to a square
             // from x to x + scale, cursor position
             // from y to y + scale, cursor position
-            if let Some((transform, &owner, &piece_type)) =
-                square_query.iter().find(|(transform, _, _)| {
-                    let size = transform.scale.x / 2.;
+            if let Some((_, &owner, &piece_type)) = square_query.iter().find(|(transform, _, _)| {
+                let size = transform.scale.x / 2.;
 
-                    let square_x = transform.translation.x;
-                    let square_y = transform.translation.y;
+                let square_x = transform.translation.x;
+                let square_y = transform.translation.y;
 
-                    let x = position.x;
-                    let y = position.y;
+                let x = position.x;
+                let y = position.y;
 
-                    // dbg!(transform, square_position);
-                    x >= square_x - size
-                        && x <= square_x + size
-                        && y >= square_y - size
-                        && y <= square_y + size
-                })
-            {
+                x >= square_x - size
+                    && x <= square_x + size
+                    && y >= square_y - size
+                    && y <= square_y + size
+            }) {
                 // Send a taker 2 event
                 ev_click.send(ReserveClickEvent { piece_type, owner });
             }
@@ -494,12 +471,12 @@ fn reserve_square_system(
     // e is the clicked on square
     for e in ev_click.iter() {
         // entity, sprite, piece_type, owner, reserve : every reserve holds these traits
-        if let Some((entity, mut sprite, piece_type, owner, reserve)) = piece_query
-            .iter_mut()
-            .find(|(_, _, &t, &o, &r)| t == e.piece_type && o == turn.player && o == e.owner && r.quantity > 0)
+        if let Some((entity, mut sprite, _, _, _)) =
+            piece_query.iter_mut().find(|(_, _, &t, &o, &r)| {
+                t == e.piece_type && o == turn.player && o == e.owner && r.quantity > 0
+            })
         {
-            // println!("cool shit");
-            if let Ok((sel_pc_e, piece_type, mut sprite)) = sel_pc_q.get_single_mut() {
+            if let Ok((sel_pc_e, _, mut sprite)) = sel_pc_q.get_single_mut() {
                 if pos_q.get(entity).is_ok() {
                     let mut entity_command = commands.entity(sel_pc_e);
                     entity_command.remove::<SelectedPiece>();
